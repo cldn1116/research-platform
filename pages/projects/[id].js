@@ -27,6 +27,7 @@ export default function ProjectEditor() {
   // ── UI state ───────────────────────────────────────────────────────────────
   const [loading,         setLoading]         = useState(true);
   const [generating,      setGenerating]      = useState(null); // null | 'full' | 'materialsAndMethods' | 'results' | 'discussion'
+  const [aiGenerating,    setAiGenerating]    = useState(null); // null | 'results_discussion' | 'introduction'
   const [activeTab,       setActiveTab]       = useState('experiments');
   const [selectedExp,     setSelectedExp]     = useState(null);
   const [editingMethod,   setEditingMethod]   = useState(null);
@@ -217,6 +218,44 @@ export default function ProjectEditor() {
     });
     setEditingMethod(null);
     setShowMethodModal(false);
+  }
+
+  // ── AI manuscript generation (Claude) ─────────────────────────────────────
+  // section: 'results_discussion' | 'introduction'
+  async function generateAiSections(force = false, section = 'results_discussion') {
+    if (generating || aiGenerating) return;
+    setAiGenerating(section);
+    try {
+      const res = await fetch(`/api/manuscript/${id}/ai`, {
+        method:  'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body:    JSON.stringify({ force, section }),
+      });
+      if (res.ok) {
+        const data = await res.json();
+        setManuscript(data.manuscript);
+        setDraftInfo({
+          generated_at:                data.generated_at,
+          timestamps:                  data.timestamps,
+          project_updated_at_snapshot: data.project_updated_at_snapshot,
+        });
+      } else {
+        let errMsg = `HTTP ${res.status}`;
+        try {
+          const body = await res.json();
+          errMsg = body.error || body.message || errMsg;
+        } catch {
+          try { errMsg = await res.text() || errMsg; } catch { /* ignore */ }
+        }
+        console.error('[AI] generation failed:', errMsg);
+        alert(`AI 생성 실패 (${section}):\n${errMsg}`);
+      }
+    } catch (err) {
+      console.error('AI generation error:', err);
+      alert(`AI 생성 중 오류:\n${err.message || '네트워크 오류 — 콘솔을 확인하세요.'}`);
+    } finally {
+      setAiGenerating(null);
+    }
   }
 
   // ── Export ─────────────────────────────────────────────────────────────────
@@ -429,8 +468,10 @@ export default function ProjectEditor() {
               draftInfo={draftInfo}
               isStale={isStale}
               generating={generating}
+              aiGenerating={aiGenerating}
               project={project}
               onGenerate={generateSection}
+              onAiGenerate={generateAiSections}
             />
           </div>
         </div>

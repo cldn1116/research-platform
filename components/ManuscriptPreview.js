@@ -148,7 +148,7 @@ const BUTTONS = [
   },
 ];
 
-function GenerationToolbar({ draftInfo, isStale, generating, onGenerate, hasDraft }) {
+function GenerationToolbar({ draftInfo, isStale, generating, onGenerate, hasDraft, aiGenerating, onAiGenerate, hasAiContent }) {
   const ts = draftInfo?.timestamps || {};
 
   return (
@@ -172,7 +172,7 @@ function GenerationToolbar({ draftInfo, isStale, generating, onGenerate, hasDraf
 
         {BUTTONS.map(btn => {
           const isRunning  = generating === btn.section;
-          const anyRunning = !!generating;
+          const anyRunning = !!generating || aiGenerating;
           const btnTs      = ts[btn.tsKey];
 
           return (
@@ -207,6 +207,109 @@ function GenerationToolbar({ draftInfo, isStale, generating, onGenerate, hasDraf
           );
         })}
 
+        {/* ── AI generation buttons ──────────────────────────── */}
+        <div className="w-px h-5 bg-gray-200 mx-1 shrink-0" />
+
+        {/* AI Methods button */}
+        <div className="flex flex-col items-start shrink-0">
+          <button
+            onClick={() => onAiGenerate(false, 'methods')}
+            disabled={!!generating || !!aiGenerating}
+            title={ko.preview.tipAiMethods}
+            className="flex items-center gap-1.5 text-xs font-semibold px-3 py-1.5 rounded-md transition-colors disabled:opacity-50 disabled:cursor-not-allowed bg-violet-600 hover:bg-violet-700 text-white"
+          >
+            {aiGenerating === 'methods' ? (
+              <svg className="w-3.5 h-3.5 animate-spin" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
+                  d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+              </svg>
+            ) : (
+              <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
+                  d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z" />
+              </svg>
+            )}
+            {aiGenerating === 'methods' ? ko.preview.aiGeneratingBtn : ko.preview.btnAiMethods}
+          </button>
+          {ts.methods_ai && (
+            <span className="text-gray-400 mt-0.5 pl-0.5" style={{ fontSize: '10px' }}>
+              {relativeTime(ts.methods_ai)}
+            </span>
+          )}
+        </div>
+
+        {/* AI Introduction button */}
+        <div className="flex flex-col items-start shrink-0">
+          <button
+            onClick={() => onAiGenerate(false, 'introduction')}
+            disabled={!!generating || !!aiGenerating}
+            title={ko.preview.tipAiIntroduction}
+            className="flex items-center gap-1.5 text-xs font-semibold px-3 py-1.5 rounded-md transition-colors disabled:opacity-50 disabled:cursor-not-allowed bg-violet-600 hover:bg-violet-700 text-white"
+          >
+            {aiGenerating === 'introduction' ? (
+              <svg className="w-3.5 h-3.5 animate-spin" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
+                  d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+              </svg>
+            ) : (
+              <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
+                  d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z" />
+              </svg>
+            )}
+            {aiGenerating === 'introduction' ? ko.preview.aiGeneratingBtn : ko.preview.btnAiIntroduction}
+          </button>
+          {ts.introduction_ai && (
+            <span className="text-gray-400 mt-0.5 pl-0.5" style={{ fontSize: '10px' }}>
+              {relativeTime(ts.introduction_ai)}
+            </span>
+          )}
+        </div>
+
+        {/* AI Results & Discussion button */}
+        <div className="flex flex-col items-start shrink-0">
+          <button
+            onClick={() => onAiGenerate(false, 'results_discussion')}
+            disabled={!!generating || !!aiGenerating}
+            title={ko.preview.tipAiGenerate}
+            className="flex items-center gap-1.5 text-xs font-semibold px-3 py-1.5 rounded-md transition-colors disabled:opacity-50 disabled:cursor-not-allowed bg-violet-600 hover:bg-violet-700 text-white"
+          >
+            {aiGenerating === 'results_discussion' ? (
+              <svg className="w-3.5 h-3.5 animate-spin" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
+                  d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+              </svg>
+            ) : (
+              <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
+                  d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z" />
+              </svg>
+            )}
+            {aiGenerating === 'results_discussion' ? ko.preview.aiGeneratingBtn : ko.preview.btnAiGenerate}
+          </button>
+          {ts.results_ai && (
+            <span className="text-gray-400 mt-0.5 pl-0.5" style={{ fontSize: '10px' }}>
+              {relativeTime(ts.results_ai)}
+            </span>
+          )}
+        </div>
+
+        {/* Regenerate button — shown only when Results/Discussion AI content exists */}
+        {hasAiContent && (
+          <button
+            onClick={() => onAiGenerate(true, 'results_discussion')}
+            disabled={!!generating || !!aiGenerating}
+            title={ko.preview.tipAiRegenerate}
+            className="flex items-center gap-1.5 text-xs font-semibold px-3 py-1.5 rounded-md transition-colors disabled:opacity-50 disabled:cursor-not-allowed bg-white border border-violet-300 text-violet-700 hover:bg-violet-50 shrink-0"
+          >
+            <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
+                d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+            </svg>
+            {ko.preview.btnAiRegenerate}
+          </button>
+        )}
+
         {/* Full-draft age (right side) */}
         <div className="ml-auto text-right shrink-0">
           {draftInfo?.generated_at ? (
@@ -231,14 +334,35 @@ export default function ManuscriptPreview({
   draftInfo,
   isStale,
   generating,
+  aiGenerating,
   project,
   onGenerate,
+  onAiGenerate,
 }) {
-  const hasDraft = !!manuscript;
+  const hasDraft     = !!manuscript;
+  const hasAiContent = !!(manuscript?.results_ai || manuscript?.discussion_ai);
+
+  // Build map: experiment id → AI formalText (for Results section)
+  const aiExpMap = {};
+  if (manuscript?.results_ai?.experiments) {
+    manuscript.results_ai.experiments.forEach(e => { aiExpMap[e.id] = e.formalText; });
+  }
+
+  // Build map: method id → AI content (for Methods section)
+  const aiMethodMap = {};
+  if (manuscript?.methods_ai?.methods) {
+    manuscript.methods_ai.methods.forEach(m => { aiMethodMap[m.id] = m; });
+  }
 
   // Overlay message while generating
   let overlayMsg = null;
-  if (generating) {
+  if (aiGenerating === 'introduction') {
+    overlayMsg = ko.preview.aiIntroOverlayMsg;
+  } else if (aiGenerating === 'methods') {
+    overlayMsg = ko.preview.aiMethodsOverlayMsg;
+  } else if (aiGenerating) {
+    overlayMsg = ko.preview.aiOverlayMsg;
+  } else if (generating) {
     overlayMsg = generating === 'full'
       ? ko.preview.updatingFull
       : ko.preview.updatingSection(ko.preview.sectionNames[generating] || generating);
@@ -279,6 +403,9 @@ export default function ManuscriptPreview({
         generating={generating}
         onGenerate={onGenerate}
         hasDraft={hasDraft}
+        aiGenerating={aiGenerating}
+        onAiGenerate={onAiGenerate}
+        hasAiContent={hasAiContent}
       />
 
       {/* ── Body ─────────────────────────────────────────── */}
@@ -310,7 +437,7 @@ export default function ManuscriptPreview({
         )}
 
         {/* Spinner before first draft */}
-        {!hasDraft && generating && (
+        {!hasDraft && (generating || aiGenerating) && (
           <div className="flex flex-col items-center justify-center h-full text-gray-400">
             <div className="animate-spin rounded-full h-10 w-10 border-2 border-blue-200 border-t-blue-600 mb-4" />
             <p className="text-sm">{ko.preview.generatingBtn}</p>
@@ -321,8 +448,8 @@ export default function ManuscriptPreview({
         {hasDraft && (
           <div className="print-page max-w-3xl mx-auto my-6 bg-white shadow-sm rounded-lg px-12 py-10 manuscript-body relative">
 
-            {/* Overlay while updating a section */}
-            {generating && (
+            {/* Overlay while updating a section (rule-based or AI) */}
+            {(generating || aiGenerating) && (
               <div className="absolute inset-0 bg-white/60 rounded-lg flex items-center justify-center z-10">
                 <div className="flex items-center gap-3 bg-white shadow-md rounded-lg px-5 py-3 border border-gray-200">
                   <div className="animate-spin rounded-full h-5 w-5 border-2 border-blue-200 border-t-blue-600" />
@@ -365,141 +492,270 @@ export default function ManuscriptPreview({
             )}
 
             {/* ── 1. Introduction ── English content ─────────── */}
-            {manuscript.introduction ? (
+            {(manuscript.introduction_ai || manuscript.introduction) ? (
               <>
                 <SectionTitle number="1" title="Introduction" />
-                <SubTitle>Background</SubTitle>
-                <Para text={manuscript.introduction.background} />
-                <SubTitle>Research Objectives</SubTitle>
-                <p className="manuscript-paragraph mb-2">
-                  The present study was designed with the following specific objectives:
-                </p>
-                <ol className="list-decimal list-inside ml-4 mb-3 space-y-1">
-                  {(manuscript.introduction.objectives || []).map((obj, i) => (
-                    <li key={i} className="text-sm leading-relaxed"><TextBlock text={obj} /></li>
-                  ))}
-                </ol>
-                <SubTitle>Significance</SubTitle>
-                <Para text={manuscript.introduction.significance} />
+
+                {manuscript.introduction_ai ? (
+                  // ── AI-generated Introduction ──────────────────
+                  <>
+                    <div className="inline-flex items-center gap-1 text-xs text-violet-700 bg-violet-50 border border-violet-200 px-2 py-0.5 rounded mb-3 no-print">
+                      <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
+                          d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z" />
+                      </svg>
+                      {ko.preview.aiBadge}
+                    </div>
+                    <SubTitle>Background</SubTitle>
+                    <Para text={manuscript.introduction_ai.background} />
+                    <SubTitle>Research Gap</SubTitle>
+                    <Para text={manuscript.introduction_ai.researchGap} />
+                    <SubTitle>Objectives</SubTitle>
+                    <Para text={manuscript.introduction_ai.objectives} />
+                    <SectionTimestamp ts={draftInfo?.timestamps?.introduction_ai} label={ko.preview.tsAiIntroLabel} />
+                  </>
+                ) : (
+                  // ── Rule-based Introduction ────────────────────
+                  <>
+                    <SubTitle>Background</SubTitle>
+                    <Para text={manuscript.introduction.background} />
+                    <SubTitle>Research Objectives</SubTitle>
+                    <p className="manuscript-paragraph mb-2">
+                      The present study was designed with the following specific objectives:
+                    </p>
+                    <ol className="list-decimal list-inside ml-4 mb-3 space-y-1">
+                      {(manuscript.introduction.objectives || []).map((obj, i) => (
+                        <li key={i} className="text-sm leading-relaxed"><TextBlock text={obj} /></li>
+                      ))}
+                    </ol>
+                    <SubTitle>Significance</SubTitle>
+                    <Para text={manuscript.introduction.significance} />
+                  </>
+                )}
               </>
             ) : (
               <SectionGhost title="1. Introduction" />
             )}
 
             {/* ── 2. Materials & Methods ── English content ──── */}
-            {manuscript.materialsAndMethods ? (
+            {(manuscript.materialsAndMethods || manuscript.methods_ai) ? (
               <>
                 <SectionTitle number="2" title="Materials and Methods" />
-                {(!manuscript.materialsAndMethods.methods || manuscript.materialsAndMethods.methods.length === 0) ? (
-                  <ContentPlaceholder text="No methods have been assigned to included experiments. Assign methods and click 'Generate Methods' to populate this section." />
-                ) : (
-                  manuscript.materialsAndMethods.methods.map((method, mi) => (
-                    <div key={method.id || mi} className="mb-5">
-                      <SubTitle>2.{mi + 1} {method.name}</SubTitle>
-                      {method.version > 1 && (
-                        <span className="text-xs text-gray-400 italic">(v{method.version})</span>
-                      )}
-                      {method.objective && (
-                        <p className="manuscript-paragraph mb-2">
-                          <strong>Objective:</strong> {method.objective}
-                        </p>
-                      )}
-                      {method.materials && method.materials.length > 0 && (
-                        <>
-                          <p className="font-semibold text-sm mb-1">Materials</p>
-                          <ul className="list-disc list-inside ml-4 mb-3 space-y-0.5">
-                            {method.materials.map((m, i) => (
-                              <li key={i} className="text-sm leading-relaxed">{m}</li>
-                            ))}
-                          </ul>
-                        </>
-                      )}
-                      {method.procedure && method.procedure.length > 0 && (
-                        <>
-                          <p className="font-semibold text-sm mb-1">Procedure</p>
-                          <ol className="list-decimal list-inside ml-4 mb-3 space-y-1">
-                            {method.procedure.map((s, i) => (
-                              <li key={i} className="text-sm leading-relaxed">{s}</li>
-                            ))}
-                          </ol>
-                        </>
-                      )}
-                      {method.usedIn && method.usedIn.length > 0 && (
-                        <p className="text-xs text-gray-400 italic mt-1">
-                          Applied in: {method.usedIn.join('; ')}.
-                        </p>
-                      )}
-                    </div>
-                  ))
+
+                {/* AI badge */}
+                {manuscript.methods_ai && (
+                  <div className="inline-flex items-center gap-1 text-xs text-violet-700 bg-violet-50 border border-violet-200 px-2 py-0.5 rounded mb-3 no-print">
+                    <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
+                        d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z" />
+                    </svg>
+                    {ko.preview.aiBadge}
+                  </div>
                 )}
-                {/* UI timestamp — Korean */}
+
+                {(() => {
+                  // Determine which method list to render from
+                  // Use rule-based list if available (has usedIn, display order); fall back to AI list
+                  const baseMethods = manuscript.materialsAndMethods?.methods?.length > 0
+                    ? manuscript.materialsAndMethods.methods
+                    : manuscript.methods_ai?.methods ?? [];
+
+                  if (baseMethods.length === 0) {
+                    return (
+                      <ContentPlaceholder text="No methods have been assigned to included experiments. Assign methods and click 'Generate Methods' to populate this section." />
+                    );
+                  }
+
+                  return baseMethods.map((method, mi) => {
+                    // Overlay AI content when available for this method id
+                    const ai = aiMethodMap[method.id];
+                    const objective = ai?.objective || method.objective || '';
+                    const materials = ai?.materials?.length  ? ai.materials  : (method.materials || []);
+                    const procedure = ai?.procedure?.length  ? ai.procedure  : (method.procedure || []);
+
+                    return (
+                      <div key={method.id || mi} className="mb-5">
+                        <SubTitle>2.{mi + 1} {method.name}</SubTitle>
+                        {method.version > 1 && (
+                          <span className="text-xs text-gray-400 italic">(v{method.version})</span>
+                        )}
+                        {objective && (
+                          <p className="manuscript-paragraph mb-2">
+                            <strong>Objective:</strong> {objective}
+                          </p>
+                        )}
+                        {materials.length > 0 && (
+                          <>
+                            <p className="font-semibold text-sm mb-1">Materials</p>
+                            <ul className="list-disc list-inside ml-4 mb-3 space-y-0.5">
+                              {materials.map((m, i) => (
+                                <li key={i} className="text-sm leading-relaxed">{m}</li>
+                              ))}
+                            </ul>
+                          </>
+                        )}
+                        {procedure.length > 0 && (
+                          <>
+                            <p className="font-semibold text-sm mb-1">Procedure</p>
+                            <ol className="list-decimal list-inside ml-4 mb-3 space-y-1">
+                              {procedure.map((s, i) => (
+                                <li key={i} className="text-sm leading-relaxed">{s}</li>
+                              ))}
+                            </ol>
+                          </>
+                        )}
+                        {method.usedIn && method.usedIn.length > 0 && (
+                          <p className="text-xs text-gray-400 italic mt-1">
+                            Applied in: {method.usedIn.join('; ')}.
+                          </p>
+                        )}
+                      </div>
+                    );
+                  });
+                })()}
+
                 <SectionTimestamp ts={draftInfo?.timestamps?.materialsAndMethods} label={ko.preview.tsMethodsLabel} />
+                {manuscript.methods_ai && (
+                  <SectionTimestamp ts={draftInfo?.timestamps?.methods_ai} label={ko.preview.tsAiMethodsLabel} />
+                )}
               </>
             ) : (
               <SectionGhost title="2. Materials and Methods" onGenerate={() => onGenerate('materialsAndMethods')} />
             )}
 
             {/* ── 3. Results ── English content ──────────────── */}
-            {manuscript.results ? (
+            {(manuscript.results || manuscript.results_ai) ? (
               <>
                 <SectionTitle number="3" title="Results" />
-                {(!manuscript.results.experiments || manuscript.results.experiments.length === 0) &&
-                 (!manuscript.results.pending     || manuscript.results.pending.length === 0) ? (
-                  <ContentPlaceholder text="No experiments currently included. Add experiments with results and click 'Generate Results'." />
-                ) : (
+
+                {/* AI badge */}
+                {manuscript.results_ai && (
+                  <div className="inline-flex items-center gap-1 text-xs text-violet-700 bg-violet-50 border border-violet-200 px-2 py-0.5 rounded mb-3 no-print">
+                    <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
+                        d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z" />
+                    </svg>
+                    {ko.preview.aiBadge}
+                  </div>
+                )}
+
+                {manuscript.results ? (
+                  // Full rendering: rule-based structure + AI formalText when available
                   <>
-                    {(manuscript.results.experiments || []).map((exp, ei) => (
-                      <div key={exp.id || ei} className="mb-6">
-                        <SubTitle>3.{ei + 1} {exp.name}</SubTitle>
-                        {exp.conditions && (
-                          <p className="text-xs text-gray-500 italic mb-2">Conditions: {exp.conditions}</p>
-                        )}
-                        <Para text={exp.formalText} />
-                        {exp.figureNumber && (
-                          <div className="manuscript-figure-legend">
-                            <strong>Figure {exp.figureNumber}.</strong>{' '}
-                            {exp.figureLegend || '[Figure legend — describe the figure content here]'}
+                    {(!manuscript.results.experiments || manuscript.results.experiments.length === 0) &&
+                     (!manuscript.results.pending     || manuscript.results.pending.length === 0) ? (
+                      <ContentPlaceholder text="No experiments currently included. Add experiments with results and click 'Generate Results'." />
+                    ) : (
+                      <>
+                        {(manuscript.results.experiments || []).map((exp, ei) => (
+                          <div key={exp.id || ei} className="mb-6">
+                            <SubTitle>3.{ei + 1} {exp.name}</SubTitle>
+                            {exp.conditions && (
+                              <p className="text-xs text-gray-500 italic mb-2">Conditions: {exp.conditions}</p>
+                            )}
+                            {/* Use AI-generated formalText when available, otherwise fall back to rule-based */}
+                            <Para text={aiExpMap[exp.id] || exp.formalText} />
+                            {exp.figureNumber && (
+                              <div className="manuscript-figure-legend">
+                                <strong>Figure {exp.figureNumber}.</strong>{' '}
+                                {exp.figureLegend || '[Figure legend — describe the figure content here]'}
+                              </div>
+                            )}
                           </div>
+                        ))}
+                        {manuscript.results.pending && manuscript.results.pending.length > 0 && (
+                          <ContentPlaceholder
+                            text={`Data pending for: ${manuscript.results.pending.join('; ')}.`}
+                          />
                         )}
-                      </div>
-                    ))}
-                    {manuscript.results.pending && manuscript.results.pending.length > 0 && (
-                      <ContentPlaceholder
-                        text={`Data pending for: ${manuscript.results.pending.join('; ')}.`}
-                      />
+                      </>
+                    )}
+                    <SectionTimestamp ts={draftInfo?.timestamps?.results} label={ko.preview.tsResultsLabel} />
+                    {manuscript.results_ai && (
+                      <SectionTimestamp ts={draftInfo?.timestamps?.results_ai} label={ko.preview.tsAiLabel} />
                     )}
                   </>
+                ) : (
+                  // AI-only rendering (no rule-based draft yet)
+                  <>
+                    {(manuscript.results_ai.experiments || []).map((exp, ei) => (
+                      <div key={exp.id || ei} className="mb-6">
+                        <SubTitle>3.{ei + 1} {exp.name || `Experiment ${exp.id}`}</SubTitle>
+                        <Para text={exp.formalText} />
+                      </div>
+                    ))}
+                    <SectionTimestamp ts={draftInfo?.timestamps?.results_ai} label={ko.preview.tsAiLabel} />
+                  </>
                 )}
-                {/* UI timestamp — Korean */}
-                <SectionTimestamp ts={draftInfo?.timestamps?.results} label={ko.preview.tsResultsLabel} />
               </>
             ) : (
               <SectionGhost title="3. Results" onGenerate={() => onGenerate('results')} />
             )}
 
             {/* ── 4. Discussion ── English content ───────────── */}
-            {manuscript.discussion ? (
+            {(manuscript.discussion_ai || manuscript.discussion) ? (
               <>
                 <SectionTitle number="4" title="Discussion" />
-                <Para text={manuscript.discussion.overview} />
-                {manuscript.discussion.perExperiment && manuscript.discussion.perExperiment.length > 0 && (
+
+                {manuscript.discussion_ai ? (
+                  // ── AI-generated Discussion ────────────────────
                   <>
-                    <SubTitle>Key Findings</SubTitle>
-                    {manuscript.discussion.perExperiment.map((item, i) => (
-                      <Para key={i} text={item.interpretation} />
-                    ))}
+                    <div className="inline-flex items-center gap-1 text-xs text-violet-700 bg-violet-50 border border-violet-200 px-2 py-0.5 rounded mb-3 no-print">
+                      <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
+                          d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z" />
+                      </svg>
+                      {ko.preview.aiBadge}
+                    </div>
+                    <Para text={manuscript.discussion_ai.overview} />
+                    {manuscript.discussion_ai.perExperiment?.length > 0 && (
+                      <>
+                        <SubTitle>Key Findings</SubTitle>
+                        {manuscript.discussion_ai.perExperiment.map((item, i) => (
+                          <div key={i} className="mb-4">
+                            <p className="font-semibold text-sm text-gray-700 mb-1">{item.name}</p>
+                            <Para text={item.interpretation} />
+                          </div>
+                        ))}
+                      </>
+                    )}
+                    {manuscript.discussion_ai.limitations && (
+                      <>
+                        <SubTitle>Limitations</SubTitle>
+                        <Para text={manuscript.discussion_ai.limitations} />
+                      </>
+                    )}
+                    {manuscript.discussion_ai.futureDirections && (
+                      <>
+                        <SubTitle>Future Directions</SubTitle>
+                        <Para text={manuscript.discussion_ai.futureDirections} />
+                      </>
+                    )}
+                    <SectionTimestamp ts={draftInfo?.timestamps?.discussion_ai} label={ko.preview.tsAiLabel} />
+                  </>
+                ) : (
+                  // ── Rule-based Discussion ──────────────────────
+                  <>
+                    <Para text={manuscript.discussion.overview} />
+                    {manuscript.discussion.perExperiment && manuscript.discussion.perExperiment.length > 0 && (
+                      <>
+                        <SubTitle>Key Findings</SubTitle>
+                        {manuscript.discussion.perExperiment.map((item, i) => (
+                          <Para key={i} text={item.interpretation} />
+                        ))}
+                      </>
+                    )}
+                    <SubTitle>Comparison with Prior Literature</SubTitle>
+                    <Para text={manuscript.discussion.priorLiterature} />
+                    <SubTitle>Mechanistic Considerations</SubTitle>
+                    <Para text={manuscript.discussion.mechanisms} />
+                    <SubTitle>Limitations</SubTitle>
+                    <Para text={manuscript.discussion.limitations} />
+                    <SubTitle>Future Directions</SubTitle>
+                    <Para text={manuscript.discussion.futureDirections} />
+                    <SectionTimestamp ts={draftInfo?.timestamps?.discussion} label={ko.preview.tsDiscussionLabel} />
                   </>
                 )}
-                <SubTitle>Comparison with Prior Literature</SubTitle>
-                <Para text={manuscript.discussion.priorLiterature} />
-                <SubTitle>Mechanistic Considerations</SubTitle>
-                <Para text={manuscript.discussion.mechanisms} />
-                <SubTitle>Limitations</SubTitle>
-                <Para text={manuscript.discussion.limitations} />
-                <SubTitle>Future Directions</SubTitle>
-                <Para text={manuscript.discussion.futureDirections} />
-                {/* UI timestamp — Korean */}
-                <SectionTimestamp ts={draftInfo?.timestamps?.discussion} label={ko.preview.tsDiscussionLabel} />
               </>
             ) : (
               <SectionGhost title="4. Discussion" onGenerate={() => onGenerate('discussion')} />
