@@ -14,6 +14,34 @@ function relativeTime(isoStr) {
   return ko.time.daysAgo(days);
 }
 
+// ── Helpers ────────────────────────────────────────────────────────────────
+
+/** Shorten a potentially long experiment name to a clean heading. */
+function shortName(s, maxLen = 80) {
+  if (!s) return '';
+  const first = s.split(/[\n\r]/)[0].trim();
+  return first.length > maxLen ? `${first.slice(0, maxLen - 1)}\u2026` : first;
+}
+
+/** Build figure legend from v2 multi-series or v1 single-series growth_curve_data. */
+function buildAutoLegend(gcd, expName) {
+  if (gcd?.version === 2 && gcd.series?.some(s => s.params)) {
+    const parts = gcd.series.filter(s => s.params).map(s => {
+      const p = s.params, n = (s.name || '').toLowerCase();
+      if (/\bod\b|biomass/i.test(n)) return `μmax = ${p.muMax} h⁻¹, lag = ${p.lagPhase} h, max ${s.name} = ${p.maxValue}`;
+      if (/etoh|ethanol/i.test(n)) return `peak ${s.name} = ${p.peakConc}${p.peakTime ? ` at ${p.peakTime} h` : ''}`;
+      if (/glucose|substrate/i.test(n)) return `${s.name}: initial = ${p.initVal}${p.depletionTime ? `, depleted at ${p.depletionTime} h` : ''}`;
+      if (/\bph\b/i.test(n)) return `pH: min = ${p.minValue} at ${p.timeToMin} h, max = ${p.maxValue}`;
+      return `${s.name}: max = ${p.maxValue}`;
+    });
+    return `${gcd.title || `Growth profile of ${expName}`}. ${parts.join('; ')}.`;
+  }
+  if (gcd?.params) {
+    return `Growth kinetics of ${expName}. \u03bcmax = ${gcd.params.muMax} h\u207b\u00b9, lag phase = ${gcd.params.lagPhase} h, maximum ${gcd.unit || 'OD'} = ${gcd.params.maxValue}.`;
+  }
+  return null;
+}
+
 // ── Manuscript content renderers (English — NOT translated) ───────────────
 
 /** Renders citation placeholders in muted italic. */
@@ -748,23 +776,20 @@ export default function ManuscriptPreview({
                     ) : (
                       <>
                         {(manuscript.results.experiments || []).map((exp, ei) => {
-                          const rawResult    = results?.[exp.id];
-                          const gcd          = rawResult?.growth_curve_data;
-                          const gcParams     = gcd?.params;
-                          const figNum       = exp.figureNumber || (gcParams ? ei + 1 : null);
-                          const autoLegend   = gcParams
-                            ? `Growth kinetics of ${exp.name}. μmax = ${gcParams.muMax} h⁻¹, lag phase = ${gcParams.lagPhase} h, maximum ${gcd.unit || 'OD'} = ${gcParams.maxValue}.`
-                            : null;
+                          const rawResult  = results?.[exp.id];
+                          const gcd        = rawResult?.growth_curve_data;
+                          const autoLegend = buildAutoLegend(gcd, exp.name);
+                          const gcHasData  = !!autoLegend;
+                          const figNum     = exp.figureNumber || (gcHasData ? ei + 1 : null);
                           return (
                             <div key={exp.id || ei} className="mb-6">
-                              <SubTitle>3.{ei + 1} {exp.name}</SubTitle>
+                              <SubTitle>3.{ei + 1} {shortName(exp.name) || `Experiment ${exp.id}`}</SubTitle>
                               {exp.conditions && (
                                 <p className="text-xs text-gray-500 italic mb-2">Conditions: {exp.conditions}</p>
                               )}
                               {/* Use AI-generated formalText when available, otherwise fall back to rule-based */}
                               <Para text={aiExpMap[exp.id] || exp.formalText} />
-                              {/* Figure legend: explicit > auto-generated from growth curve */}
-                              {(exp.figureNumber || gcParams) && (
+                              {(exp.figureNumber || gcHasData) && (
                                 <div className="manuscript-figure-legend">
                                   <strong>Figure {figNum}.</strong>{' '}
                                   {exp.figureLegend || autoLegend || '[Figure legend]'}
@@ -789,17 +814,17 @@ export default function ManuscriptPreview({
                   // AI-only rendering (no rule-based draft yet)
                   <>
                     {(manuscript.results_ai.experiments || []).map((exp, ei) => {
-                      const rawResult = results?.[exp.id];
-                      const gcd       = rawResult?.growth_curve_data;
-                      const gcParams  = gcd?.params;
+                      const rawResult  = results?.[exp.id];
+                      const gcd        = rawResult?.growth_curve_data;
+                      const autoLegend = buildAutoLegend(gcd, exp.name || `Experiment ${exp.id}`);
                       return (
                         <div key={exp.id || ei} className="mb-6">
-                          <SubTitle>3.{ei + 1} {exp.name || `Experiment ${exp.id}`}</SubTitle>
+                          <SubTitle>3.{ei + 1} {shortName(exp.name) || `Experiment ${exp.id}`}</SubTitle>
                           <Para text={exp.formalText} />
-                          {gcParams && (
+                          {autoLegend && (
                             <div className="manuscript-figure-legend">
                               <strong>Figure {ei + 1}.</strong>{' '}
-                              {`Growth kinetics of ${exp.name || `Experiment ${exp.id}`}. μmax = ${gcParams.muMax} h⁻¹, lag phase = ${gcParams.lagPhase} h, maximum ${gcd.unit || 'OD'} = ${gcParams.maxValue}.`}
+                              {autoLegend}
                             </div>
                           )}
                         </div>
