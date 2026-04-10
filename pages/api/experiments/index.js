@@ -6,9 +6,10 @@ export default async function handler(req, res) {
     if (!projectId) return res.status(400).json({ error: 'projectId required' });
 
     const exps = await query(
-      `SELECT e.*, m.name AS method_name
+      `SELECT e.*, m.name AS method_name, g.name AS group_name
        FROM experiments e
        LEFT JOIN methods m ON m.id = e.method_id
+       LEFT JOIN experiment_groups g ON g.id = e.group_id
        WHERE e.project_id = $1
        ORDER BY e.display_order ASC, e.created_at ASC`,
       [projectId]
@@ -17,7 +18,7 @@ export default async function handler(req, res) {
   }
 
   if (req.method === 'POST') {
-    const { project_id, method_id, name, conditions = '', status = 'included' } = req.body;
+    const { project_id, method_id, group_id, name, conditions = '', status = 'included' } = req.body;
     if (!project_id || !name?.trim()) {
       return res.status(400).json({ error: 'project_id and name are required' });
     }
@@ -34,20 +35,23 @@ export default async function handler(req, res) {
     const nextOrder = orderRow?.next_order ?? 0;
 
     const exp = await queryOne(
-      `INSERT INTO experiments (project_id, method_id, name, conditions, status, display_order)
-       VALUES ($1, $2, $3, $4, $5, $6) RETURNING *`,
-      [project_id, method_id || null, name.trim(), conditions, safeStatus, nextOrder]
+      `INSERT INTO experiments (project_id, method_id, group_id, name, conditions, status, display_order)
+       VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING *`,
+      [project_id, method_id || null, group_id || null, name.trim(), conditions, safeStatus, nextOrder]
     );
 
-    // Attach method_name for the response
+    // Attach method_name and group_name for the response
     const methodName = exp.method_id
       ? (await queryOne('SELECT name FROM methods WHERE id = $1', [exp.method_id]))?.name ?? null
+      : null;
+    const groupName = exp.group_id
+      ? (await queryOne('SELECT name FROM experiment_groups WHERE id = $1', [exp.group_id]))?.name ?? null
       : null;
 
     // Touch project updated_at
     await query('UPDATE projects SET updated_at = NOW() WHERE id = $1', [project_id]);
 
-    return res.status(201).json({ ...exp, method_name: methodName });
+    return res.status(201).json({ ...exp, method_name: methodName, group_name: groupName });
   }
 
   res.status(405).json({ error: 'Method not allowed' });

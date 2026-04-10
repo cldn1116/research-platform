@@ -17,6 +17,7 @@ export default function ProjectEditor() {
   const [methods,     setMethods]     = useState([]);
   const [experiments, setExperiments] = useState([]);
   const [results,     setResults]     = useState({});   // keyed by experiment_id
+  const [groups,      setGroups]      = useState([]);   // experiment groups
 
   // ── Draft state ────────────────────────────────────────────────────────────
   // manuscript: the last-saved draft object (or null if never generated)
@@ -41,21 +42,24 @@ export default function ProjectEditor() {
   const loadAll = useCallback(async (projectId) => {
     setLoading(true);
     try {
-      const [projRes, methodsRes, expsRes] = await Promise.all([
+      const [projRes, methodsRes, expsRes, groupsRes] = await Promise.all([
         fetch(`/api/projects/${projectId}`),
         fetch(`/api/methods?projectId=${projectId}`),
         fetch(`/api/experiments?projectId=${projectId}`),
+        fetch(`/api/projects/${projectId}/groups`),
       ]);
 
       if (!projRes.ok) { router.push('/'); return; }
 
-      const [proj, meths, exps] = await Promise.all([
+      const [proj, meths, exps, grps] = await Promise.all([
         projRes.json(), methodsRes.json(), expsRes.json(),
+        groupsRes.ok ? groupsRes.json() : Promise.resolve([]),
       ]);
 
       setProject(proj);
       setMethods(meths);
       setExperiments(exps);
+      setGroups(grps);
       setProjForm({
         title:          proj.title,
         research_topic: proj.research_topic,
@@ -220,6 +224,38 @@ export default function ProjectEditor() {
     setShowMethodModal(false);
   }
 
+  // ── Experiment group CRUD ─────────────────────────────────────────────────
+  async function handleGroupCreate(name) {
+    const res = await fetch(`/api/projects/${id}/groups`, {
+      method:  'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body:    JSON.stringify({ name }),
+    });
+    if (res.ok) {
+      const newGroup = await res.json();
+      setGroups(prev => [...prev, newGroup]);
+    }
+  }
+
+  async function handleGroupDelete(groupId) {
+    await fetch(`/api/groups/${groupId}`, { method: 'DELETE' });
+    setGroups(prev => prev.filter(g => g.id !== groupId));
+    setExperiments(prev => prev.map(e => e.group_id === groupId ? { ...e, group_id: null, group_name: null } : e));
+  }
+
+  async function handleGroupRename(groupId, name) {
+    const res = await fetch(`/api/groups/${groupId}`, {
+      method:  'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body:    JSON.stringify({ name }),
+    });
+    if (res.ok) {
+      const updated = await res.json();
+      setGroups(prev => prev.map(g => g.id === groupId ? updated : g));
+      setExperiments(prev => prev.map(e => e.group_id === groupId ? { ...e, group_name: name } : e));
+    }
+  }
+
   // ── AI manuscript generation (Claude) ─────────────────────────────────────
   // section: 'results_discussion' | 'introduction'
   async function generateAiSections(force = false, section = 'results_discussion') {
@@ -376,11 +412,15 @@ export default function ProjectEditor() {
               <ExperimentSidebar
                 experiments={experiments}
                 results={results}
+                groups={groups}
                 selectedId={selectedExp?.id}
                 onSelect={(exp) => { setSelectedExp(exp); setShowExpModal(true); }}
                 onStatusChange={handleStatusChange}
                 onDelete={handleDeleteExperiment}
                 onAdd={() => { setSelectedExp(null); setShowExpModal(true); }}
+                onGroupCreate={handleGroupCreate}
+                onGroupDelete={handleGroupDelete}
+                onGroupRename={handleGroupRename}
               />
             )}
 
@@ -489,6 +529,7 @@ export default function ProjectEditor() {
           <ExperimentForm
             projectId={Number(id)}
             methods={methods}
+            groups={groups}
             experiment={selectedExp}
             result={selectedResult}
             onSave={handleExpSave}

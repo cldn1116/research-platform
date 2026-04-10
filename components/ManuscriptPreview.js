@@ -148,6 +148,41 @@ const BUTTONS = [
   },
 ];
 
+// ── Reusable AI button (violet) ────────────────────────────────────────────
+function AiButton({ section, label, tip, tsKey, aiGenerating, generating, onAiGenerate, ts }) {
+  const isRunning = aiGenerating === section;
+  const spinIcon = (
+    <svg className="w-3.5 h-3.5 animate-spin" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
+        d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+    </svg>
+  );
+  const sparkIcon = (
+    <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
+        d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z" />
+    </svg>
+  );
+  return (
+    <div className="flex flex-col items-start shrink-0">
+      <button
+        onClick={() => onAiGenerate(false, section)}
+        disabled={!!generating || !!aiGenerating}
+        title={tip}
+        className="flex items-center gap-1.5 text-xs font-semibold px-3 py-1.5 rounded-md transition-colors disabled:opacity-50 disabled:cursor-not-allowed bg-violet-600 hover:bg-violet-700 text-white"
+      >
+        {isRunning ? spinIcon : sparkIcon}
+        {isRunning ? ko.preview.aiGeneratingBtn : label}
+      </button>
+      {ts[tsKey] && (
+        <span className="text-gray-400 mt-0.5 pl-0.5" style={{ fontSize: '10px' }}>
+          {relativeTime(ts[tsKey])}
+        </span>
+      )}
+    </div>
+  );
+}
+
 function GenerationToolbar({ draftInfo, isStale, generating, onGenerate, hasDraft, aiGenerating, onAiGenerate, hasAiContent }) {
   const ts = draftInfo?.timestamps || {};
 
@@ -207,94 +242,58 @@ function GenerationToolbar({ draftInfo, isStale, generating, onGenerate, hasDraf
           );
         })}
 
-        {/* ── AI generation buttons ──────────────────────────── */}
+        {/* ── AI generation buttons (paper flow order) ───────── */}
         <div className="w-px h-5 bg-gray-200 mx-1 shrink-0" />
 
-        {/* AI Methods button */}
-        <div className="flex flex-col items-start shrink-0">
-          <button
-            onClick={() => onAiGenerate(false, 'methods')}
-            disabled={!!generating || !!aiGenerating}
-            title={ko.preview.tipAiMethods}
-            className="flex items-center gap-1.5 text-xs font-semibold px-3 py-1.5 rounded-md transition-colors disabled:opacity-50 disabled:cursor-not-allowed bg-violet-600 hover:bg-violet-700 text-white"
-          >
-            {aiGenerating === 'methods' ? (
-              <svg className="w-3.5 h-3.5 animate-spin" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
-                  d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
-              </svg>
-            ) : (
-              <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
-                  d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z" />
-              </svg>
-            )}
-            {aiGenerating === 'methods' ? ko.preview.aiGeneratingBtn : ko.preview.btnAiMethods}
-          </button>
-          {ts.methods_ai && (
-            <span className="text-gray-400 mt-0.5 pl-0.5" style={{ fontSize: '10px' }}>
-              {relativeTime(ts.methods_ai)}
-            </span>
-          )}
-        </div>
+        {/* AI Abstract */}
+        <AiButton
+          section="abstract"
+          label={ko.preview.btnAiAbstract}
+          tip={ko.preview.tipAiAbstract}
+          tsKey="abstract_ai"
+          aiGenerating={aiGenerating}
+          generating={generating}
+          onAiGenerate={onAiGenerate}
+          ts={ts}
+        />
 
-        {/* AI Introduction button */}
-        <div className="flex flex-col items-start shrink-0">
-          <button
-            onClick={() => onAiGenerate(false, 'introduction')}
-            disabled={!!generating || !!aiGenerating}
-            title={ko.preview.tipAiIntroduction}
-            className="flex items-center gap-1.5 text-xs font-semibold px-3 py-1.5 rounded-md transition-colors disabled:opacity-50 disabled:cursor-not-allowed bg-violet-600 hover:bg-violet-700 text-white"
-          >
-            {aiGenerating === 'introduction' ? (
-              <svg className="w-3.5 h-3.5 animate-spin" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
-                  d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
-              </svg>
-            ) : (
-              <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
-                  d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z" />
-              </svg>
-            )}
-            {aiGenerating === 'introduction' ? ko.preview.aiGeneratingBtn : ko.preview.btnAiIntroduction}
-          </button>
-          {ts.introduction_ai && (
-            <span className="text-gray-400 mt-0.5 pl-0.5" style={{ fontSize: '10px' }}>
-              {relativeTime(ts.introduction_ai)}
-            </span>
-          )}
-        </div>
+        {/* AI Introduction */}
+        <AiButton
+          section="introduction"
+          label={ko.preview.btnAiIntroduction}
+          tip={ko.preview.tipAiIntroduction}
+          tsKey="introduction_ai"
+          aiGenerating={aiGenerating}
+          generating={generating}
+          onAiGenerate={onAiGenerate}
+          ts={ts}
+        />
 
-        {/* AI Results & Discussion button */}
-        <div className="flex flex-col items-start shrink-0">
-          <button
-            onClick={() => onAiGenerate(false, 'results_discussion')}
-            disabled={!!generating || !!aiGenerating}
-            title={ko.preview.tipAiGenerate}
-            className="flex items-center gap-1.5 text-xs font-semibold px-3 py-1.5 rounded-md transition-colors disabled:opacity-50 disabled:cursor-not-allowed bg-violet-600 hover:bg-violet-700 text-white"
-          >
-            {aiGenerating === 'results_discussion' ? (
-              <svg className="w-3.5 h-3.5 animate-spin" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
-                  d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
-              </svg>
-            ) : (
-              <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
-                  d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z" />
-              </svg>
-            )}
-            {aiGenerating === 'results_discussion' ? ko.preview.aiGeneratingBtn : ko.preview.btnAiGenerate}
-          </button>
-          {ts.results_ai && (
-            <span className="text-gray-400 mt-0.5 pl-0.5" style={{ fontSize: '10px' }}>
-              {relativeTime(ts.results_ai)}
-            </span>
-          )}
-        </div>
+        {/* AI Methods */}
+        <AiButton
+          section="methods"
+          label={ko.preview.btnAiMethods}
+          tip={ko.preview.tipAiMethods}
+          tsKey="methods_ai"
+          aiGenerating={aiGenerating}
+          generating={generating}
+          onAiGenerate={onAiGenerate}
+          ts={ts}
+        />
 
-        {/* Regenerate button — shown only when Results/Discussion AI content exists */}
+        {/* AI Results & Discussion */}
+        <AiButton
+          section="results_discussion"
+          label={ko.preview.btnAiGenerate}
+          tip={ko.preview.tipAiGenerate}
+          tsKey="results_ai"
+          aiGenerating={aiGenerating}
+          generating={generating}
+          onAiGenerate={onAiGenerate}
+          ts={ts}
+        />
+
+        {/* Regenerate — shown when any AI content exists */}
         {hasAiContent && (
           <button
             onClick={() => onAiGenerate(true, 'results_discussion')}
@@ -340,7 +339,13 @@ export default function ManuscriptPreview({
   onAiGenerate,
 }) {
   const hasDraft     = !!manuscript;
-  const hasAiContent = !!(manuscript?.results_ai || manuscript?.discussion_ai);
+  const hasAiContent = !!(
+    manuscript?.results_ai   ||
+    manuscript?.discussion_ai ||
+    manuscript?.introduction_ai ||
+    manuscript?.methods_ai    ||
+    manuscript?.abstract_ai
+  );
 
   // Build map: experiment id → AI formalText (for Results section)
   const aiExpMap = {};
@@ -356,7 +361,9 @@ export default function ManuscriptPreview({
 
   // Overlay message while generating
   let overlayMsg = null;
-  if (aiGenerating === 'introduction') {
+  if (aiGenerating === 'abstract') {
+    overlayMsg = ko.preview.aiAbstractOverlayMsg;
+  } else if (aiGenerating === 'introduction') {
     overlayMsg = ko.preview.aiIntroOverlayMsg;
   } else if (aiGenerating === 'methods') {
     overlayMsg = ko.preview.aiMethodsOverlayMsg;
@@ -475,20 +482,35 @@ export default function ManuscriptPreview({
             <hr className="border-gray-300 mb-6" />
 
             {/* ── Abstract ───── English content ─────────────── */}
-            {manuscript.abstract ? (
+            {(manuscript.abstract_ai || manuscript.abstract) ? (
               <>
                 <SectionTitle title="Abstract" />
-                <Para text={manuscript.abstract.text} />
+                {manuscript.abstract_ai ? (
+                  <>
+                    <div className="inline-flex items-center gap-1 text-xs text-violet-700 bg-violet-50 border border-violet-200 px-2 py-0.5 rounded mb-3 no-print">
+                      <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
+                          d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z" />
+                      </svg>
+                      {ko.preview.aiBadge}
+                    </div>
+                    <Para text={manuscript.abstract_ai.text} />
+                    <SectionTimestamp ts={draftInfo?.timestamps?.abstract_ai} label={ko.preview.tsAiAbstractLabel} />
+                  </>
+                ) : (
+                  <>
+                    <Para text={manuscript.abstract.text} />
+                    <SectionTimestamp ts={draftInfo?.timestamps?.results} label={ko.preview.tsAbstractLabel} />
+                  </>
+                )}
                 {manuscript.meta?.keywords && (
                   <p className="manuscript-keywords">
                     <strong>Keywords:</strong> {manuscript.meta.keywords}
                   </p>
                 )}
-                {/* UI timestamp — Korean */}
-                <SectionTimestamp ts={draftInfo?.timestamps?.results} label={ko.preview.tsAbstractLabel} />
               </>
             ) : (
-              <SectionGhost title="Abstract" />
+              <SectionGhost title="Abstract" onGenerate={() => onAiGenerate(false, 'abstract')} />
             )}
 
             {/* ── 1. Introduction ── English content ─────────── */}

@@ -28,6 +28,8 @@ import {
   computeIntroductionHash,
   generateAiMethods,
   computeMethodsHash,
+  generateAiAbstract,
+  computeAbstractHash,
 } from '../../../../lib/aiManuscriptGenerator';
 
 export default async function handler(req, res) {
@@ -38,9 +40,9 @@ export default async function handler(req, res) {
   const { projectId } = req.query;
   const { force = false, section = 'results_discussion' } = req.body || {};
 
-  if (!['results_discussion', 'introduction', 'methods'].includes(section)) {
+  if (!['results_discussion', 'introduction', 'methods', 'abstract'].includes(section)) {
     return res.status(400).json({
-      error: `Unknown section "${section}". Valid values: results_discussion, introduction, methods`,
+      error: `Unknown section "${section}". Valid values: results_discussion, introduction, methods, abstract`,
     });
   }
 
@@ -73,6 +75,13 @@ export default async function handler(req, res) {
     if (section === 'methods') {
       return await handleMethods({
         res, projectId, project, methods, included,
+        force, existing, prevManuscript, prevTimestamps,
+      });
+    }
+
+    if (section === 'abstract') {
+      return await handleAbstract({
+        res, projectId, project,
         force, existing, prevManuscript, prevTimestamps,
       });
     }
@@ -245,6 +254,58 @@ async function handleMethods({
   const mergedTimestamps = {
     ...prevTimestamps,
     methods_ai: nowStr,
+  };
+
+  return saveAndRespond({ res, projectId, existing, project, mergedManuscript, mergedTimestamps });
+}
+
+// ── Abstract ───────────────────────────────────────────────────────────────
+
+async function handleAbstract({
+  res, projectId, project,
+  force, existing, prevManuscript, prevTimestamps,
+}) {
+  // Need at least one AI section to summarize
+  const hasAiContent = !!(
+    prevManuscript.introduction_ai ||
+    prevManuscript.methods_ai      ||
+    prevManuscript.results_ai      ||
+    prevManuscript.discussion_ai
+  );
+  if (!hasAiContent) {
+    return res.status(400).json({
+      error: 'Abstract를 생성하려면 먼저 다른 AI 섹션(Introduction, Methods, Results & Discussion)을 하나 이상 생성해야 합니다.',
+    });
+  }
+
+  // Cache check
+  if (!force) {
+    const currentHash = computeAbstractHash(project, prevManuscript);
+    if (
+      currentHash === prevManuscript.abstract_input_hash &&
+      prevManuscript.abstract_ai
+    ) {
+      return res.status(200).json({
+        manuscript:                  prevManuscript,
+        generated_at:                existing?.generated_at ?? null,
+        timestamps:                  prevTimestamps,
+        project_updated_at_snapshot: existing?.project_updated_at_snapshot ?? null,
+        cached:                      true,
+      });
+    }
+  }
+
+  const { abstract_ai, abstractHash } = await generateAiAbstract(project, prevManuscript);
+
+  const nowStr = new Date().toISOString();
+  const mergedManuscript = {
+    ...prevManuscript,
+    abstract_ai,
+    abstract_input_hash: abstractHash,
+  };
+  const mergedTimestamps = {
+    ...prevTimestamps,
+    abstract_ai: nowStr,
   };
 
   return saveAndRespond({ res, projectId, existing, project, mergedManuscript, mergedTimestamps });

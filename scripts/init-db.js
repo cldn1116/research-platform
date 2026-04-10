@@ -92,6 +92,19 @@ CREATE TABLE IF NOT EXISTS results (
   updated_at    TIMESTAMPTZ  NOT NULL DEFAULT NOW()
 );
 
+-- Experiment groups (folders for organising experiments)
+CREATE TABLE IF NOT EXISTS experiment_groups (
+  id            SERIAL       PRIMARY KEY,
+  project_id    INTEGER      NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
+  name          TEXT         NOT NULL,
+  color         TEXT         NOT NULL DEFAULT 'blue',
+  display_order INTEGER      NOT NULL DEFAULT 0,
+  created_at    TIMESTAMPTZ  NOT NULL DEFAULT NOW()
+);
+
+-- Add group_id to experiments (safe to run multiple times)
+ALTER TABLE experiments ADD COLUMN IF NOT EXISTS group_id INTEGER REFERENCES experiment_groups(id) ON DELETE SET NULL;
+
 -- Manuscript drafts (one per project)
 CREATE TABLE IF NOT EXISTS drafts (
   id                          SERIAL       PRIMARY KEY,

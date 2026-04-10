@@ -10,7 +10,7 @@ const STATUS_META = {
 const STATUS_CYCLE = ['included', 'supplementary', 'excluded'];
 
 // Group display order
-const GROUPS = [
+const STATUS_GROUPS = [
   { key: 'included',      label: ko.sidebar.groupIncluded      },
   { key: 'supplementary', label: ko.sidebar.groupSupplementary },
   { key: 'excluded',      label: ko.sidebar.groupExcluded      },
@@ -19,11 +19,15 @@ const GROUPS = [
 export default function ExperimentSidebar({
   experiments,
   results,
+  groups,
   selectedId,
   onSelect,
   onStatusChange,
   onDelete,
   onAdd,
+  onGroupCreate,
+  onGroupDelete,
+  onGroupRename,
 }) {
   const byStatus = {
     included:      experiments.filter(e => e.status === 'included'),
@@ -42,6 +46,23 @@ export default function ExperimentSidebar({
     e.stopPropagation();
     if (!confirm(ko.sidebar.deleteConfirm(exp.name))) return;
     await onDelete(exp.id);
+  }
+
+  async function handleNewGroup() {
+    const name = prompt(ko.sidebar.newGroupPrompt);
+    if (name?.trim()) await onGroupCreate(name.trim());
+  }
+
+  async function handleRenameGroup(group, e) {
+    e.stopPropagation();
+    const name = prompt(ko.sidebar.renameGroupPrompt, group.name);
+    if (name?.trim() && name.trim() !== group.name) await onGroupRename(group.id, name.trim());
+  }
+
+  async function handleDeleteGroup(group, e) {
+    e.stopPropagation();
+    if (!confirm(ko.sidebar.deleteGroupConfirm(group.name))) return;
+    await onGroupDelete(group.id);
   }
 
   function ExperimentCard({ exp }) {
@@ -104,6 +125,87 @@ export default function ExperimentSidebar({
     );
   }
 
+  // Render experiments within a status section, grouped by group_id
+  function StatusSection({ statusKey, statusLabel }) {
+    const statusExps = byStatus[statusKey];
+    if (statusExps.length === 0) return null;
+
+    // Partition by group
+    const byGroupId = {};
+    statusExps.forEach(exp => {
+      const gid = exp.group_id ?? 'ungrouped';
+      if (!byGroupId[gid]) byGroupId[gid] = [];
+      byGroupId[gid].push(exp);
+    });
+
+    const groupsWithExps = (groups || []).filter(g => byGroupId[g.id]?.length > 0);
+    const ungroupedExps  = byGroupId['ungrouped'] || [];
+    const hasAnyGroups   = groupsWithExps.length > 0;
+
+    return (
+      <div className="mb-4">
+        <p className="text-xs text-gray-400 font-medium uppercase tracking-wider mb-2 px-1">
+          {ko.sidebar.groupLabel(statusLabel, statusExps.length)}
+        </p>
+
+        {/* Grouped experiments */}
+        {groupsWithExps.map(g => (
+          <div key={g.id} className="mb-2">
+            <div className="flex items-center gap-1 px-1 mb-1 group/grp">
+              <svg className="w-3 h-3 text-gray-400 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
+                  d="M3 7a2 2 0 012-2h4l2 2h8a2 2 0 012 2v7a2 2 0 01-2 2H5a2 2 0 01-2-2V7z" />
+              </svg>
+              <span className="text-xs font-medium text-gray-600 flex-1 truncate">{g.name}</span>
+              {/* Rename / delete buttons — visible on hover */}
+              {onGroupRename && (
+                <button
+                  onClick={(e) => handleRenameGroup(g, e)}
+                  className="opacity-0 group-hover/grp:opacity-100 text-gray-400 hover:text-gray-600 transition-opacity p-0.5"
+                  title="그룹 이름 변경"
+                >
+                  <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
+                      d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                  </svg>
+                </button>
+              )}
+              {onGroupDelete && (
+                <button
+                  onClick={(e) => handleDeleteGroup(g, e)}
+                  className="opacity-0 group-hover/grp:opacity-100 text-red-400 hover:text-red-600 transition-opacity p-0.5"
+                  title="그룹 삭제"
+                >
+                  <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
+                      d="M6 18L18 6M6 6l12 12" />
+                  </svg>
+                </button>
+              )}
+            </div>
+            <div className="pl-3 border-l border-gray-100 ml-1.5">
+              {byGroupId[g.id].map(exp => (
+                <ExperimentCard key={exp.id} exp={exp} />
+              ))}
+            </div>
+          </div>
+        ))}
+
+        {/* Ungrouped experiments */}
+        {ungroupedExps.length > 0 && (
+          <div>
+            {hasAnyGroups && (
+              <p className="text-xs text-gray-300 px-1 mb-1 italic">{ko.sidebar.ungrouped}</p>
+            )}
+            {ungroupedExps.map(exp => (
+              <ExperimentCard key={exp.id} exp={exp} />
+            ))}
+          </div>
+        )}
+      </div>
+    );
+  }
+
   return (
     <div className="flex flex-col h-full">
       {/* Header */}
@@ -112,9 +214,20 @@ export default function ExperimentSidebar({
           <span className="text-xs font-semibold text-gray-500 uppercase tracking-wider">
             {ko.sidebar.header}
           </span>
-          <span className="text-xs text-gray-400">
-            {ko.sidebar.summary(byStatus.included.length, experiments.length)}
-          </span>
+          <div className="flex items-center gap-2">
+            <span className="text-xs text-gray-400">
+              {ko.sidebar.summary(byStatus.included.length, experiments.length)}
+            </span>
+            {onGroupCreate && (
+              <button
+                onClick={handleNewGroup}
+                className="text-xs text-blue-600 hover:text-blue-800 font-medium transition-colors"
+                title={ko.sidebar.newGroupBtn}
+              >
+                {ko.sidebar.newGroupBtn}
+              </button>
+            )}
+          </div>
         </div>
       </div>
 
@@ -126,18 +239,9 @@ export default function ExperimentSidebar({
             <p className="text-xs">{ko.sidebar.noExperimentsHint}</p>
           </div>
         ) : (
-          GROUPS.map(({ key, label }) =>
-            byStatus[key].length > 0 ? (
-              <div key={key} className="mb-4">
-                <p className="text-xs text-gray-400 font-medium uppercase tracking-wider mb-2 px-1">
-                  {ko.sidebar.groupLabel(label, byStatus[key].length)}
-                </p>
-                {byStatus[key].map(exp => (
-                  <ExperimentCard key={exp.id} exp={exp} />
-                ))}
-              </div>
-            ) : null
-          )
+          STATUS_GROUPS.map(({ key, label }) => (
+            <StatusSection key={key} statusKey={key} statusLabel={label} />
+          ))
         )}
       </div>
 

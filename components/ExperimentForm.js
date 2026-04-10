@@ -11,13 +11,14 @@ const STATUS_OPTIONS = [
 export default function ExperimentForm({
   projectId,
   methods,
+  groups,
   experiment,
   result,
   onSave,
   onCancel,
 }) {
   const [form, setForm] = useState({
-    name: '', method_id: '', conditions: '', status: 'included',
+    name: '', method_id: '', group_id: '', conditions: '', status: 'included',
   });
   const [rawText,      setRawText]      = useState('');
   const [formalText,   setFormalText]   = useState('');
@@ -32,11 +33,12 @@ export default function ExperimentForm({
       setForm({
         name:       experiment.name       || '',
         method_id:  experiment.method_id  ? String(experiment.method_id) : '',
+        group_id:   experiment.group_id   ? String(experiment.group_id)  : '',
         conditions: experiment.conditions || '',
         status:     experiment.status     || 'included',
       });
     } else {
-      setForm({ name: '', method_id: '', conditions: '', status: 'included' });
+      setForm({ name: '', method_id: '', group_id: '', conditions: '', status: 'included' });
     }
     if (result) {
       setRawText(result.raw_text       || '');
@@ -86,7 +88,7 @@ export default function ExperimentForm({
         const res = await fetch(`/api/experiments/${experiment.id}`, {
           method:  'PUT',
           headers: { 'Content-Type': 'application/json' },
-          body:    JSON.stringify({ ...form, method_id: form.method_id || null }),
+          body:    JSON.stringify({ ...form, method_id: form.method_id || null, group_id: form.group_id || null }),
         });
         if (!res.ok) throw new Error((await res.json()).error || '실험 저장에 실패했습니다.');
         savedExp = await res.json();
@@ -94,7 +96,7 @@ export default function ExperimentForm({
         const res = await fetch('/api/experiments', {
           method:  'POST',
           headers: { 'Content-Type': 'application/json' },
-          body:    JSON.stringify({ ...form, project_id: projectId, method_id: form.method_id || null }),
+          body:    JSON.stringify({ ...form, project_id: projectId, method_id: form.method_id || null, group_id: form.group_id || null }),
         });
         if (!res.ok) throw new Error((await res.json()).error || '실험 생성에 실패했습니다.');
         savedExp = await res.json();
@@ -169,6 +171,21 @@ export default function ExperimentForm({
             ))}
           </select>
         </div>
+
+        {groups && groups.length > 0 && (
+          <div className="col-span-2">
+            <label className={labelCls}>
+              {ko.expForm.groupLabel}{' '}
+              <span className={optionalCls}>{ko.common.optional}</span>
+            </label>
+            <select className={inputCls} value={form.group_id} onChange={setField('group_id')}>
+              <option value="">{ko.expForm.noGroup}</option>
+              {groups.map(g => (
+                <option key={g.id} value={String(g.id)}>{g.name}</option>
+              ))}
+            </select>
+          </div>
+        )}
       </div>
 
       <div>
