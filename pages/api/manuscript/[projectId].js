@@ -2,17 +2,15 @@
  * Manuscript draft API
  *
  * GET  /api/manuscript/[projectId]
- *   Returns the stored draft for a project, or null if none exists.
- *   Never re-generates — only reads what was last saved.
+ *   Returns the stored draft (or null). Never re-generates.
  *
  * POST /api/manuscript/[projectId]
  *   Body: { section: 'full' | 'materialsAndMethods' | 'results' | 'discussion' }
- *   Generates the requested section(s), merges into the stored draft, saves, returns.
+ *   Generates the requested sections, merges into the stored draft, saves, returns.
  */
-import { db } from '../../../lib/db';
+import { query, queryOne } from '../../../lib/db';
 import { generateManuscript } from '../../../lib/manuscriptGenerator';
 
-// Sections controlled by each button
 const SECTION_KEYS = {
   materialsAndMethods: ['materialsAndMethods'],
   results:             ['results', 'abstract'],
@@ -22,79 +20,88 @@ const SECTION_KEYS = {
                         'references', 'stats'],
 };
 
-export default function handler(req, res) {
+export default async function handler(req, res) {
   const { projectId } = req.query;
-  const id = Number(projectId);
 
-  const project = db.projects.find(id);
+  const project = await queryOne('SELECT * FROM projects WHERE id = $1', [projectId]);
   if (!project) return res.status(404).json({ error: 'Project not found' });
 
   // ── GET — return stored draft ──────────────────────────────────────────────
   if (req.method === 'GET') {
-    const draft = db.drafts.where(d => d.project_id === id)[0] || null;
+    const draft = await queryOne('SELECT * FROM drafts WHERE project_id = $1', [projectId]);
     if (!draft) return res.status(200).json(null);
 
     return res.status(200).json({
-      manuscript:   draft.manuscript,
-      generated_at: draft.generated_at,
-      timestamps:   draft.timestamps,
+      manuscript:                  draft.manuscript,
+      generated_at:                draft.generated_at,
+      timestamps:                  draft.timestamps,
+      project_updated_at_snapshot: draft.project_updated_at_snapshot,
     });
   }
 
-  // ── POST — generate section(s) and save ───────────────────────────────────
+  // ── POST — generate section(s) and upsert draft ───────────────────────────
   if (req.method === 'POST') {
     const { section = 'full' } = req.body || {};
 
     if (!SECTION_KEYS[section]) {
-      return res.status(400).json({ error: `Unknown section "${section}". Valid: ${Object.keys(SECTION_KEYS).join(', ')}` });
+      return res.status(400).json({
+        error: `Unknown section "${section}". Valid: ${Object.keys(SECTION_KEYS).join(', ')}`,
+      });
     }
 
-    // Gather data
-    const methods     = db.methods.where(m => m.project_id === id);
-    const experiments = db.experiments.where(e => e.project_id === id);
-    const expIds      = new Set(experiments.map(e => e.id));
-    const results     = db.results.where(r => expIds.has(r.experiment_id));
+    // Gather latest data from DB
+    const methods     = await query('SELECT * FROM methods WHERE project_id = $1', [projectId]);
+    const experiments = await query(
+      'SELECT * FROM experiments WHERE project_id = $1 ORDER BY display_order ASC, created_at ASC',
+      [projectId]
+    );
+    const expIds = experiments.map(e => e.id);
+    const results = expIds.length
+      ? await query('SELECT * FROM results WHERE experiment_id = ANY($1)', [expIds])
+      : [];
 
-    // Generate fresh manuscript object (pure JS, fast)
+    // Generate fresh manuscript object (pure JS, no network, fast)
     const fresh = generateManuscript(project, methods, experiments, results);
 
-    // Load existing draft (or start from scratch)
-    const existing = db.drafts.where(d => d.project_id === id)[0];
-    const prevManuscript  = existing ? existing.manuscript  : {};
-    const prevTimestamps  = existing ? existing.timestamps  : {};
+    // Load existing draft to merge into
+    const existing      = await queryOne('SELECT * FROM drafts WHERE project_id = $1', [projectId]);
+    const prevManuscript = existing?.manuscript  ?? {};
+    const prevTimestamps = existing?.timestamps  ?? {};
 
-    // Merge: copy only the keys requested by this section button
-    const keysToUpdate = SECTION_KEYS[section];
+    // Merge: only update the keys this button controls
+    const keysToUpdate     = SECTION_KEYS[section];
     const mergedManuscript = { ...prevManuscript };
     keysToUpdate.forEach(key => { mergedManuscript[key] = fresh[key]; });
-
-    // Always keep meta and stats current
+    // Always sync meta + stats from live data
     mergedManuscript.meta  = fresh.meta;
     mergedManuscript.stats = fresh.stats;
 
-    const nowStr = new Date().toISOString();
+    const nowStr          = new Date().toISOString();
     const mergedTimestamps = { ...prevTimestamps };
     keysToUpdate.forEach(key => { mergedTimestamps[key] = nowStr; });
 
-    // Upsert draft
-    let saved;
-    if (existing) {
-      saved = db.drafts.update(existing.id, {
-        manuscript:   mergedManuscript,
-        timestamps:   mergedTimestamps,
-        generated_at: section === 'full' ? nowStr : (existing.generated_at || nowStr),
-        // Track the project's update timestamp at generation time for staleness detection
-        project_updated_at_snapshot: project.updated_at,
-      });
-    } else {
-      saved = db.drafts.create({
-        project_id:                  id,
-        manuscript:                  mergedManuscript,
-        timestamps:                  mergedTimestamps,
-        generated_at:                section === 'full' ? nowStr : null,
-        project_updated_at_snapshot: project.updated_at,
-      });
-    }
+    const generatedAt = section === 'full'
+      ? nowStr
+      : (existing?.generated_at ?? null);
+
+    const saved = await queryOne(
+      `INSERT INTO drafts (project_id, manuscript, timestamps, generated_at, project_updated_at_snapshot)
+       VALUES ($1, $2, $3, $4, $5)
+       ON CONFLICT (project_id) DO UPDATE SET
+         manuscript                  = EXCLUDED.manuscript,
+         timestamps                  = EXCLUDED.timestamps,
+         generated_at                = EXCLUDED.generated_at,
+         project_updated_at_snapshot = EXCLUDED.project_updated_at_snapshot,
+         updated_at                  = NOW()
+       RETURNING *`,
+      [
+        projectId,
+        JSON.stringify(mergedManuscript),
+        JSON.stringify(mergedTimestamps),
+        generatedAt,
+        project.updated_at,
+      ]
+    );
 
     return res.status(200).json({
       manuscript:                  saved.manuscript,

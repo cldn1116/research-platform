@@ -1,46 +1,46 @@
-import { db } from '../../../lib/db';
+import { query, queryOne } from '../../../lib/db';
 import { formalizeWithContext } from '../../../lib/textFormalizer';
 
-export default function handler(req, res) {
+export default async function handler(req, res) {
   const { experimentId } = req.query;
 
   if (req.method === 'GET') {
-    const result = db.results.where(r => r.experiment_id === Number(experimentId))[0];
+    const result = await queryOne(
+      'SELECT * FROM results WHERE experiment_id = $1',
+      [experimentId]
+    );
     if (!result) return res.status(404).json({ error: 'No result found for this experiment' });
     return res.status(200).json(result);
   }
 
   if (req.method === 'PUT') {
-    const { raw_text, formal_text, figure_legend } = req.body;
+    const { raw_text = '', formal_text = '', figure_legend = '' } = req.body;
 
-    const exp = db.experiments.find(experimentId);
+    const exp = await queryOne('SELECT * FROM experiments WHERE id = $1', [experimentId]);
     if (!exp) return res.status(404).json({ error: 'Experiment not found' });
 
-    const method = exp.method_id ? db.methods.find(exp.method_id) : null;
+    const method = exp.method_id
+      ? await queryOne('SELECT name FROM methods WHERE id = $1', [exp.method_id])
+      : null;
 
-    const computedFormal = (formal_text && formal_text.trim())
+    const computedFormal = formal_text?.trim()
       ? formal_text.trim()
-      : formalizeWithContext(raw_text || '', exp.name, method ? method.name : null);
+      : formalizeWithContext(raw_text, exp.name, method?.name ?? null);
 
-    const existing = db.results.where(r => r.experiment_id === Number(experimentId))[0];
-    let result;
-    if (existing) {
-      result = db.results.update(existing.id, {
-        raw_text:      raw_text      || '',
-        formal_text:   computedFormal,
-        figure_legend: figure_legend || '',
-      });
-    } else {
-      result = db.results.create({
-        experiment_id: Number(experimentId),
-        raw_text:      raw_text      || '',
-        formal_text:   computedFormal,
-        figure_legend: figure_legend || '',
-      });
-    }
+    const result = await queryOne(
+      `INSERT INTO results (experiment_id, raw_text, formal_text, figure_legend)
+       VALUES ($1, $2, $3, $4)
+       ON CONFLICT (experiment_id) DO UPDATE SET
+         raw_text      = EXCLUDED.raw_text,
+         formal_text   = EXCLUDED.formal_text,
+         figure_legend = EXCLUDED.figure_legend,
+         updated_at    = NOW()
+       RETURNING *`,
+      [experimentId, raw_text, computedFormal, figure_legend]
+    );
 
-    db.experiments.update(experimentId, {});
-    db.projects.update(exp.project_id, {});
+    await query('UPDATE experiments SET updated_at = NOW() WHERE id = $1', [experimentId]);
+    await query('UPDATE projects    SET updated_at = NOW() WHERE id = $1', [exp.project_id]);
 
     return res.status(200).json(result);
   }

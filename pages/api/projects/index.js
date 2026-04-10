@@ -1,32 +1,35 @@
-import { db } from '../../../lib/db';
+import { query, queryOne } from '../../../lib/db';
 
-export default function handler(req, res) {
+export default async function handler(req, res) {
   if (req.method === 'GET') {
-    const projects     = db.projects.all().sort((a, b) => b.updated_at.localeCompare(a.updated_at));
-    const allExps      = db.experiments.all();
-
-    const enriched = projects.map(p => {
-      const exps = allExps.filter(e => e.project_id === p.id);
-      return {
-        ...p,
-        experiment_count: exps.length,
-        included_count:   exps.filter(e => e.status === 'included').length,
-      };
-    });
-    return res.status(200).json(enriched);
+    const rows = await query(`
+      SELECT p.*,
+        COUNT(e.id)::int                                         AS experiment_count,
+        COUNT(CASE WHEN e.status = 'included' THEN 1 END)::int  AS included_count
+      FROM projects p
+      LEFT JOIN experiments e ON e.project_id = p.id
+      GROUP BY p.id
+      ORDER BY p.updated_at DESC
+    `);
+    return res.status(200).json(rows);
   }
 
   if (req.method === 'POST') {
-    const { title, research_topic, authors, institution, keywords } = req.body;
-    if (!title || !title.trim()) return res.status(400).json({ error: 'Title is required' });
+    const {
+      title,
+      research_topic = '',
+      authors        = '',
+      institution    = '',
+      keywords       = '',
+    } = req.body;
 
-    const project = db.projects.create({
-      title: title.trim(),
-      research_topic: research_topic || '',
-      authors:        authors        || '',
-      institution:    institution    || '',
-      keywords:       keywords       || '',
-    });
+    if (!title?.trim()) return res.status(400).json({ error: 'Title is required' });
+
+    const project = await queryOne(
+      `INSERT INTO projects (title, research_topic, authors, institution, keywords)
+       VALUES ($1, $2, $3, $4, $5) RETURNING *`,
+      [title.trim(), research_topic, authors, institution, keywords]
+    );
     return res.status(201).json(project);
   }
 

@@ -1,4 +1,4 @@
-import { db } from '../../../lib/db';
+import { query, queryOne } from '../../../lib/db';
 import { generateManuscript } from '../../../lib/manuscriptGenerator';
 import {
   Document, Packer, Paragraph, TextRun, HeadingLevel,
@@ -10,30 +10,31 @@ export default async function handler(req, res) {
 
   const { projectId, format } = req.query;
 
-  const project = db.projects.find(projectId);
+  const project = await queryOne('SELECT * FROM projects WHERE id = $1', [projectId]);
   if (!project) return res.status(404).json({ error: 'Project not found' });
 
-  // Prefer the stored draft; fall back to live generation if no draft exists yet
-  const draft = db.drafts.where(d => d.project_id === Number(projectId))[0];
+  // Prefer the stored draft; fall back to live generation if none exists
+  const draft = await queryOne('SELECT * FROM drafts WHERE project_id = $1', [projectId]);
+
   let ms;
-  if (draft && draft.manuscript && Object.keys(draft.manuscript).length > 0) {
-    ms = draft.manuscript;
-    // Always sync meta (title, authors etc.) from live project data
-    const { generateManuscript: gen } = require('../../../lib/manuscriptGenerator');
-    const live = gen(project, [], [], []);
-    ms = { ...ms, meta: live.meta };
+  if (draft?.manuscript && Object.keys(draft.manuscript).length > 0) {
+    ms = { ...draft.manuscript };
+    // Always sync meta (title, authors, date) from live project
+    ms.meta = generateManuscript(project, [], [], []).meta;
   } else {
-    const methods     = db.methods.where(m => m.project_id === Number(projectId));
-    const experiments = db.experiments.where(e => e.project_id === Number(projectId));
-    const expIds      = new Set(experiments.map(e => e.id));
-    const results     = db.results.where(r => expIds.has(r.experiment_id));
+    const methods     = await query('SELECT * FROM methods WHERE project_id = $1', [projectId]);
+    const experiments = await query('SELECT * FROM experiments WHERE project_id = $1', [projectId]);
+    const expIds      = experiments.map(e => e.id);
+    const results     = expIds.length
+      ? await query('SELECT * FROM results WHERE experiment_id = ANY($1)', [expIds])
+      : [];
     ms = generateManuscript(project, methods, experiments, results);
   }
 
   if (format === 'docx') {
     const doc    = buildDocx(ms);
     const buffer = await Packer.toBuffer(doc);
-    const name   = ms.meta.title.replace(/[^a-z0-9]/gi, '_').toLowerCase();
+    const name   = (ms.meta?.title || 'manuscript').replace(/[^a-z0-9]/gi, '_').toLowerCase();
     res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document');
     res.setHeader('Content-Disposition', `attachment; filename="${name}.docx"`);
     return res.send(buffer);
@@ -42,10 +43,10 @@ export default async function handler(req, res) {
   return res.status(200).json(ms);
 }
 
-// ── DOCX helper functions ──────────────────────────────────────────────────
+// ── DOCX builder ───────────────────────────────────────────────────────────
 
 const FONT = 'Times New Roman';
-const SIZE = 22; // half-points = 11pt
+const SIZE = 22; // half-points → 11 pt
 
 function run(text, opts = {}) {
   return new TextRun({ text, font: FONT, size: SIZE, ...opts });
@@ -99,17 +100,20 @@ function italic(text) {
 }
 
 function buildDocx(ms) {
-  const { meta, abstract, introduction, materialsAndMethods, results, discussion, conclusion, supplementary, references } = ms;
+  const {
+    meta, abstract, introduction, materialsAndMethods,
+    results, discussion, conclusion, supplementary, references,
+  } = ms;
   const children = [];
 
-  // Title
+  // Title block
   children.push(new Paragraph({
     children: [run(meta.title, { bold: true, size: 32 })],
     alignment: AlignmentType.CENTER,
     spacing: { before: 0, after: 160 },
   }));
-  if (meta.authors) children.push(new Paragraph({ children: [run(meta.authors, { italics: true, size: 24 })], alignment: AlignmentType.CENTER, spacing: { after: 60 } }));
-  if (meta.institution) children.push(new Paragraph({ children: [run(meta.institution, { size: 22 })], alignment: AlignmentType.CENTER, spacing: { after: 60 } }));
+  if (meta.authors)     children.push(new Paragraph({ children: [run(meta.authors,     { italics: true, size: 24 })], alignment: AlignmentType.CENTER, spacing: { after: 60 } }));
+  if (meta.institution) children.push(new Paragraph({ children: [run(meta.institution, { size: 22 })],               alignment: AlignmentType.CENTER, spacing: { after: 60 } }));
   children.push(new Paragraph({ children: [run(meta.date, { size: 20, color: '888888' })], alignment: AlignmentType.CENTER, spacing: { after: 240 } }));
 
   // Abstract
@@ -129,7 +133,7 @@ function buildDocx(ms) {
   // Materials & Methods
   children.push(heading(HeadingLevel.HEADING_1, '2. Materials and Methods'));
   if (materialsAndMethods.methods.length === 0) {
-    children.push(p('No methods assigned to included experiments.', { style: 'Normal' }));
+    children.push(p('No methods assigned to included experiments.'));
   } else {
     materialsAndMethods.methods.forEach((method, mi) => {
       children.push(subheading(`2.${mi + 1} ${method.name}`));
@@ -175,7 +179,7 @@ function buildDocx(ms) {
   children.push(p(conclusion));
 
   // Supplementary
-  if (supplementary && supplementary.length > 0) {
+  if (supplementary?.length > 0) {
     children.push(heading(HeadingLevel.HEADING_1, 'Supplementary Materials'));
     supplementary.forEach((supp, si) => {
       children.push(subheading(`Supplementary Figure S${supp.figureNumber || si + 1}: ${supp.name}`));
@@ -186,7 +190,10 @@ function buildDocx(ms) {
   // References
   children.push(heading(HeadingLevel.HEADING_1, 'References'));
   references.forEach((ref, i) => children.push(numbered(i + 1, ref)));
-  children.push(new Paragraph({ children: [run('Note: Replace placeholders with actual references.', { italics: true, size: 18, color: '888888' })], spacing: { before: 160 } }));
+  children.push(new Paragraph({
+    children: [run('Note: Replace placeholders with actual references.', { italics: true, size: 18, color: '888888' })],
+    spacing: { before: 160 },
+  }));
 
   return new Document({
     styles: { default: { document: { run: { font: FONT, size: SIZE }, paragraph: { spacing: { line: 360 } } } } },

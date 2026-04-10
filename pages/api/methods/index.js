@@ -1,34 +1,40 @@
-import { db } from '../../../lib/db';
+import { query, queryOne } from '../../../lib/db';
 
-export default function handler(req, res) {
+export default async function handler(req, res) {
   if (req.method === 'GET') {
     const { projectId } = req.query;
     if (!projectId) return res.status(400).json({ error: 'projectId required' });
 
-    const allExps = db.experiments.all();
-    const methods = db.methods
-      .where(m => m.project_id === Number(projectId))
-      .sort((a, b) => a.name.localeCompare(b.name))
-      .map(m => ({
-        ...m,
-        usage_count: allExps.filter(e => e.method_id === m.id).length,
-      }));
+    const methods = await query(
+      `SELECT m.*, COUNT(e.id)::int AS usage_count
+       FROM methods m
+       LEFT JOIN experiments e ON e.method_id = m.id
+       WHERE m.project_id = $1
+       GROUP BY m.id
+       ORDER BY m.name`,
+      [projectId]
+    );
     return res.status(200).json(methods);
   }
 
   if (req.method === 'POST') {
-    const { project_id, name, objective, materials, procedure } = req.body;
-    if (!project_id || !name || !name.trim()) {
+    const {
+      project_id,
+      name,
+      objective  = '',
+      materials  = '',
+      procedure  = '',
+    } = req.body;
+
+    if (!project_id || !name?.trim()) {
       return res.status(400).json({ error: 'project_id and name are required' });
     }
-    const method = db.methods.create({
-      project_id: Number(project_id),
-      name:       name.trim(),
-      objective:  objective || '',
-      materials:  materials || '',
-      procedure:  procedure || '',
-      version:    1,
-    });
+
+    const method = await queryOne(
+      `INSERT INTO methods (project_id, name, objective, materials, procedure, version)
+       VALUES ($1, $2, $3, $4, $5, 1) RETURNING *`,
+      [project_id, name.trim(), objective, materials, procedure]
+    );
     return res.status(201).json(method);
   }
 
