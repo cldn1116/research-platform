@@ -6,6 +6,7 @@ import ExperimentSidebar from '../../components/ExperimentSidebar';
 import ExperimentForm from '../../components/ExperimentForm';
 import MethodEditor from '../../components/MethodEditor';
 import ManuscriptPreview from '../../components/ManuscriptPreview';
+import GrowthCurveBuilder from '../../components/GrowthCurveBuilder';
 import { ko } from '../../lib/ko';
 
 export default function ProjectEditor() {
@@ -29,7 +30,7 @@ export default function ProjectEditor() {
   const [loading,         setLoading]         = useState(true);
   const [generating,      setGenerating]      = useState(null); // null | 'full' | 'materialsAndMethods' | 'results' | 'discussion'
   const [aiGenerating,    setAiGenerating]    = useState(null); // null | 'results_discussion' | 'introduction'
-  const [activeTab,       setActiveTab]       = useState('experiments');
+  const [activeTab,       setActiveTab]       = useState('experiments'); // 'experiments' | 'methods' | 'growthcurve'
   const [selectedExp,     setSelectedExp]     = useState(null);
   const [editingMethod,   setEditingMethod]   = useState(null);
   const [showExpModal,    setShowExpModal]    = useState(false);
@@ -391,18 +392,22 @@ export default function ProjectEditor() {
 
             {/* Tab switcher */}
             <div className="flex border-b border-gray-200 shrink-0">
-              {['experiments', 'methods'].map(tab => (
+              {[
+                { key: 'experiments', label: ko.editor.experimentsTab(experiments.length) },
+                { key: 'methods',     label: ko.editor.methodsTab(methods.length) },
+                { key: 'growthcurve', label: ko.growthCurve.tabLabel },
+              ].map(({ key, label }) => (
                 <button
-                  key={tab}
-                  onClick={() => setActiveTab(tab)}
+                  key={key}
+                  onClick={() => setActiveTab(key)}
                   className={`
                     flex-1 py-2.5 text-xs font-semibold uppercase tracking-wider transition-colors
-                    ${activeTab === tab
+                    ${activeTab === key
                       ? 'text-blue-700 border-b-2 border-blue-700 bg-blue-50'
                       : 'text-gray-500 hover:text-gray-700 hover:bg-gray-50'}
                   `}
                 >
-                  {tab === 'experiments' ? ko.editor.experimentsTab(experiments.length) : ko.editor.methodsTab(methods.length)}
+                  {label}
                 </button>
               ))}
             </div>
@@ -498,6 +503,17 @@ export default function ProjectEditor() {
                   </button>
                 </div>
               </div>
+            )}
+
+            {/* ── Growth Curve tab ─────────────────────────────────── */}
+            {activeTab === 'growthcurve' && (
+              <GrowthCurveBuilder
+                experiments={experiments}
+                results={results}
+                onResultSaved={(expId, savedResult) => {
+                  setResults(prev => ({ ...prev, [expId]: savedResult }));
+                }}
+              />
             )}
           </div>
 

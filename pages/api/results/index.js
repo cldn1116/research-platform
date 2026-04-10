@@ -4,7 +4,7 @@ import { formalizeWithContext } from '../../../lib/textFormalizer';
 export default async function handler(req, res) {
   if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
 
-  const { experiment_id, raw_text = '', formal_text = '', figure_legend = '' } = req.body;
+  const { experiment_id, raw_text = '', formal_text = '', figure_legend = '', growth_curve_data } = req.body;
   if (!experiment_id) return res.status(400).json({ error: 'experiment_id required' });
 
   const exp = await queryOne('SELECT * FROM experiments WHERE id = $1', [experiment_id]);
@@ -20,15 +20,16 @@ export default async function handler(req, res) {
 
   // Upsert — one result row per experiment (UNIQUE constraint on experiment_id)
   const result = await queryOne(
-    `INSERT INTO results (experiment_id, raw_text, formal_text, figure_legend)
-     VALUES ($1, $2, $3, $4)
+    `INSERT INTO results (experiment_id, raw_text, formal_text, figure_legend, growth_curve_data)
+     VALUES ($1, $2, $3, $4, $5)
      ON CONFLICT (experiment_id) DO UPDATE SET
-       raw_text      = EXCLUDED.raw_text,
-       formal_text   = EXCLUDED.formal_text,
-       figure_legend = EXCLUDED.figure_legend,
-       updated_at    = NOW()
+       raw_text          = EXCLUDED.raw_text,
+       formal_text       = EXCLUDED.formal_text,
+       figure_legend     = EXCLUDED.figure_legend,
+       growth_curve_data = COALESCE(EXCLUDED.growth_curve_data, results.growth_curve_data),
+       updated_at        = NOW()
      RETURNING *`,
-    [experiment_id, raw_text, computedFormal, figure_legend]
+    [experiment_id, raw_text, computedFormal, figure_legend, growth_curve_data ? JSON.stringify(growth_curve_data) : null]
   );
 
   // Touch experiment and project for staleness detection

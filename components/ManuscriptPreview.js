@@ -1,3 +1,4 @@
+import React from 'react';
 import { ko } from '../lib/ko';
 
 // ── Relative time (Korean) ─────────────────────────────────────────────────
@@ -328,6 +329,65 @@ function GenerationToolbar({ draftInfo, isStale, generating, onGenerate, hasDraf
 
 // ── Main component ─────────────────────────────────────────────────────────
 
+// ── Draft Chat Editor panel (UI shell — not yet functional) ───────────────
+function ChatPanel({ onClose }) {
+  return (
+    <div className="flex flex-col h-full border-l border-gray-200 bg-white w-72 shrink-0">
+      {/* Header */}
+      <div className="flex items-center justify-between px-4 py-3 border-b border-gray-200 bg-gray-50 shrink-0">
+        <div className="flex items-center gap-2">
+          <svg className="w-4 h-4 text-violet-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
+              d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
+          </svg>
+          <span className="text-xs font-semibold text-gray-700 uppercase tracking-wider">
+            {ko.chat.panelTitle}
+          </span>
+        </div>
+        <button
+          onClick={onClose}
+          className="text-gray-400 hover:text-gray-600 p-1 rounded transition-colors"
+          title={ko.chat.closeBtn}
+        >
+          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+          </svg>
+        </button>
+      </div>
+
+      {/* Coming soon placeholder */}
+      <div className="flex-1 flex flex-col items-center justify-center px-6 text-center">
+        <div className="w-12 h-12 bg-violet-50 rounded-full flex items-center justify-center mb-4">
+          <svg className="w-6 h-6 text-violet-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5}
+              d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z" />
+          </svg>
+        </div>
+        <p className="text-sm font-semibold text-gray-600 mb-2">{ko.chat.comingSoon}</p>
+        <p className="text-xs text-gray-400 leading-relaxed">{ko.chat.comingSoonDesc}</p>
+      </div>
+
+      {/* Input area (disabled) */}
+      <div className="px-3 pb-3 pt-2 border-t border-gray-100 shrink-0">
+        <div className="flex gap-2">
+          <input
+            type="text"
+            disabled
+            placeholder={ko.chat.placeholder}
+            className="flex-1 border border-gray-200 rounded-md px-3 py-2 text-xs bg-gray-50 text-gray-400 cursor-not-allowed"
+          />
+          <button
+            disabled
+            className="bg-violet-200 text-violet-400 cursor-not-allowed text-xs font-semibold px-3 py-2 rounded-md"
+          >
+            {ko.chat.sendBtn}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export default function ManuscriptPreview({
   manuscript,
   draftInfo,
@@ -338,6 +398,8 @@ export default function ManuscriptPreview({
   onGenerate,
   onAiGenerate,
 }) {
+  const [showChat, setShowChat] = React.useState(false);
+
   const hasDraft     = !!manuscript;
   const hasAiContent = !!(
     manuscript?.results_ai   ||
@@ -376,7 +438,10 @@ export default function ManuscriptPreview({
   }
 
   return (
-    <div className="h-full flex flex-col">
+    <div className="h-full flex flex-row overflow-hidden">
+
+    {/* ── Main preview column ──────────────────────────── */}
+    <div className="flex-1 flex flex-col overflow-hidden">
 
       {/* ── Status bar ──────────────────────────────────── */}
       <div className="flex items-center justify-between px-4 py-2 border-b border-gray-200 bg-gray-50 no-print shrink-0">
@@ -393,14 +458,26 @@ export default function ManuscriptPreview({
             )}
           </span>
         )}
-        {hasDraft && (
+        <div className="flex items-center gap-2">
           <button
-            onClick={() => window.print()}
-            className="text-xs bg-white border border-gray-300 hover:bg-gray-50 px-3 py-1 rounded text-gray-600 transition-colors"
+            onClick={() => setShowChat(c => !c)}
+            className={`text-xs border px-3 py-1 rounded transition-colors ${
+              showChat
+                ? 'bg-violet-600 text-white border-violet-600'
+                : 'bg-white border-gray-300 hover:bg-gray-50 text-gray-600'
+            }`}
           >
-            {ko.preview.printBtn}
+            {ko.chat.openBtn}
           </button>
-        )}
+          {hasDraft && (
+            <button
+              onClick={() => window.print()}
+              className="text-xs bg-white border border-gray-300 hover:bg-gray-50 px-3 py-1 rounded text-gray-600 transition-colors"
+            >
+              {ko.preview.printBtn}
+            </button>
+          )}
+        </div>
       </div>
 
       {/* ── Generation toolbar (Korean UI) ───────────────── */}
@@ -838,6 +915,11 @@ export default function ManuscriptPreview({
           </div>
         )}
       </div>
+    </div>
+
+    {/* ── Chat panel (toggleable) ─────────────────────── */}
+    {showChat && <ChatPanel onClose={() => setShowChat(false)} />}
+
     </div>
   );
 }

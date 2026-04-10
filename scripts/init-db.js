@@ -105,6 +105,9 @@ CREATE TABLE IF NOT EXISTS experiment_groups (
 -- Add group_id to experiments (safe to run multiple times)
 ALTER TABLE experiments ADD COLUMN IF NOT EXISTS group_id INTEGER REFERENCES experiment_groups(id) ON DELETE SET NULL;
 
+-- Add growth_curve_data to results (safe to run multiple times)
+ALTER TABLE results ADD COLUMN IF NOT EXISTS growth_curve_data JSONB DEFAULT NULL;
+
 -- Manuscript drafts (one per project)
 CREATE TABLE IF NOT EXISTS drafts (
   id                          SERIAL       PRIMARY KEY,

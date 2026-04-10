@@ -14,7 +14,7 @@ export default async function handler(req, res) {
   }
 
   if (req.method === 'PUT') {
-    const { raw_text = '', formal_text = '', figure_legend = '' } = req.body;
+    const { raw_text = '', formal_text = '', figure_legend = '', growth_curve_data } = req.body;
 
     const exp = await queryOne('SELECT * FROM experiments WHERE id = $1', [experimentId]);
     if (!exp) return res.status(404).json({ error: 'Experiment not found' });
@@ -28,15 +28,16 @@ export default async function handler(req, res) {
       : formalizeWithContext(raw_text, exp.name, method?.name ?? null);
 
     const result = await queryOne(
-      `INSERT INTO results (experiment_id, raw_text, formal_text, figure_legend)
-       VALUES ($1, $2, $3, $4)
+      `INSERT INTO results (experiment_id, raw_text, formal_text, figure_legend, growth_curve_data)
+       VALUES ($1, $2, $3, $4, $5)
        ON CONFLICT (experiment_id) DO UPDATE SET
-         raw_text      = EXCLUDED.raw_text,
-         formal_text   = EXCLUDED.formal_text,
-         figure_legend = EXCLUDED.figure_legend,
-         updated_at    = NOW()
+         raw_text          = EXCLUDED.raw_text,
+         formal_text       = EXCLUDED.formal_text,
+         figure_legend     = EXCLUDED.figure_legend,
+         growth_curve_data = COALESCE(EXCLUDED.growth_curve_data, results.growth_curve_data),
+         updated_at        = NOW()
        RETURNING *`,
-      [experimentId, raw_text, computedFormal, figure_legend]
+      [experimentId, raw_text, computedFormal, figure_legend, growth_curve_data ? JSON.stringify(growth_curve_data) : null]
     );
 
     await query('UPDATE experiments SET updated_at = NOW() WHERE id = $1', [experimentId]);
