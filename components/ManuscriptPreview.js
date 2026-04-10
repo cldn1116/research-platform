@@ -395,6 +395,7 @@ export default function ManuscriptPreview({
   generating,
   aiGenerating,
   project,
+  results,       // raw results map keyed by experiment_id — used for growth curve display
   onGenerate,
   onAiGenerate,
 }) {
@@ -746,22 +747,32 @@ export default function ManuscriptPreview({
                       <ContentPlaceholder text="No experiments currently included. Add experiments with results and click 'Generate Results'." />
                     ) : (
                       <>
-                        {(manuscript.results.experiments || []).map((exp, ei) => (
-                          <div key={exp.id || ei} className="mb-6">
-                            <SubTitle>3.{ei + 1} {exp.name}</SubTitle>
-                            {exp.conditions && (
-                              <p className="text-xs text-gray-500 italic mb-2">Conditions: {exp.conditions}</p>
-                            )}
-                            {/* Use AI-generated formalText when available, otherwise fall back to rule-based */}
-                            <Para text={aiExpMap[exp.id] || exp.formalText} />
-                            {exp.figureNumber && (
-                              <div className="manuscript-figure-legend">
-                                <strong>Figure {exp.figureNumber}.</strong>{' '}
-                                {exp.figureLegend || '[Figure legend — describe the figure content here]'}
-                              </div>
-                            )}
-                          </div>
-                        ))}
+                        {(manuscript.results.experiments || []).map((exp, ei) => {
+                          const rawResult    = results?.[exp.id];
+                          const gcd          = rawResult?.growth_curve_data;
+                          const gcParams     = gcd?.params;
+                          const figNum       = exp.figureNumber || (gcParams ? ei + 1 : null);
+                          const autoLegend   = gcParams
+                            ? `Growth kinetics of ${exp.name}. μmax = ${gcParams.muMax} h⁻¹, lag phase = ${gcParams.lagPhase} h, maximum ${gcd.unit || 'OD'} = ${gcParams.maxValue}.`
+                            : null;
+                          return (
+                            <div key={exp.id || ei} className="mb-6">
+                              <SubTitle>3.{ei + 1} {exp.name}</SubTitle>
+                              {exp.conditions && (
+                                <p className="text-xs text-gray-500 italic mb-2">Conditions: {exp.conditions}</p>
+                              )}
+                              {/* Use AI-generated formalText when available, otherwise fall back to rule-based */}
+                              <Para text={aiExpMap[exp.id] || exp.formalText} />
+                              {/* Figure legend: explicit > auto-generated from growth curve */}
+                              {(exp.figureNumber || gcParams) && (
+                                <div className="manuscript-figure-legend">
+                                  <strong>Figure {figNum}.</strong>{' '}
+                                  {exp.figureLegend || autoLegend || '[Figure legend]'}
+                                </div>
+                              )}
+                            </div>
+                          );
+                        })}
                         {manuscript.results.pending && manuscript.results.pending.length > 0 && (
                           <ContentPlaceholder
                             text={`Data pending for: ${manuscript.results.pending.join('; ')}.`}
@@ -777,12 +788,23 @@ export default function ManuscriptPreview({
                 ) : (
                   // AI-only rendering (no rule-based draft yet)
                   <>
-                    {(manuscript.results_ai.experiments || []).map((exp, ei) => (
-                      <div key={exp.id || ei} className="mb-6">
-                        <SubTitle>3.{ei + 1} {exp.name || `Experiment ${exp.id}`}</SubTitle>
-                        <Para text={exp.formalText} />
-                      </div>
-                    ))}
+                    {(manuscript.results_ai.experiments || []).map((exp, ei) => {
+                      const rawResult = results?.[exp.id];
+                      const gcd       = rawResult?.growth_curve_data;
+                      const gcParams  = gcd?.params;
+                      return (
+                        <div key={exp.id || ei} className="mb-6">
+                          <SubTitle>3.{ei + 1} {exp.name || `Experiment ${exp.id}`}</SubTitle>
+                          <Para text={exp.formalText} />
+                          {gcParams && (
+                            <div className="manuscript-figure-legend">
+                              <strong>Figure {ei + 1}.</strong>{' '}
+                              {`Growth kinetics of ${exp.name || `Experiment ${exp.id}`}. μmax = ${gcParams.muMax} h⁻¹, lag phase = ${gcParams.lagPhase} h, maximum ${gcd.unit || 'OD'} = ${gcParams.maxValue}.`}
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })}
                     <SectionTimestamp ts={draftInfo?.timestamps?.results_ai} label={ko.preview.tsAiLabel} />
                   </>
                 )}

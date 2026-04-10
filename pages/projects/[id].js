@@ -526,6 +526,7 @@ export default function ProjectEditor() {
               generating={generating}
               aiGenerating={aiGenerating}
               project={project}
+              results={results}
               onGenerate={generateSection}
               onAiGenerate={generateAiSections}
             />
