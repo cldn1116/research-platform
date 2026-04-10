@@ -38,6 +38,7 @@ export default function ProjectEditor() {
   const [showProjModal,   setShowProjModal]   = useState(false);
   const [projForm,        setProjForm]        = useState({});
   const [savingProj,      setSavingProj]      = useState(false);
+  const [mobilePanel,     setMobilePanel]     = useState('left'); // 'left' | 'right'
 
   // ── Initial data load ──────────────────────────────────────────────────────
   const loadAll = useCallback(async (projectId) => {
@@ -356,6 +357,30 @@ export default function ProjectEditor() {
               </div>
             </div>
 
+            {/* Mobile panel toggle */}
+            <div className="flex md:hidden items-center gap-1 shrink-0 mr-2">
+              <button
+                onClick={() => setMobilePanel('left')}
+                className={`text-xs px-2.5 py-1.5 rounded-md font-medium transition-colors ${
+                  mobilePanel === 'left'
+                    ? 'bg-blue-700 text-white'
+                    : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                }`}
+              >
+                {ko.editor.experimentsTab(experiments.length).split('(')[0].trim()}
+              </button>
+              <button
+                onClick={() => setMobilePanel('right')}
+                className={`text-xs px-2.5 py-1.5 rounded-md font-medium transition-colors ${
+                  mobilePanel === 'right'
+                    ? 'bg-blue-700 text-white'
+                    : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                }`}
+              >
+                {ko.editor.previewTab}
+              </button>
+            </div>
+
             {/* Export buttons */}
             <div className="flex items-center gap-2 shrink-0">
               <button
@@ -388,7 +413,11 @@ export default function ProjectEditor() {
         <div className="flex flex-1 overflow-hidden no-print">
 
           {/* ══ LEFT PANEL ════════════════════════════════════════════ */}
-          <div className="w-80 shrink-0 border-r border-gray-200 bg-white flex flex-col overflow-hidden">
+          <div className={`
+            shrink-0 border-r border-gray-200 bg-white flex flex-col overflow-hidden
+            w-full md:w-80
+            ${mobilePanel === 'left' ? 'flex' : 'hidden md:flex'}
+          `}>
 
             {/* Tab switcher */}
             <div className="flex border-b border-gray-200 shrink-0">
@@ -518,7 +547,11 @@ export default function ProjectEditor() {
           </div>
 
           {/* ══ RIGHT PANEL — Manuscript Preview ══════════════════════ */}
-          <div className="flex-1 overflow-hidden">
+          <div className={`
+            overflow-hidden
+            flex-1
+            ${mobilePanel === 'right' ? 'flex flex-col' : 'hidden md:block'}
+          `}>
             <ManuscriptPreview
               manuscript={manuscript}
               draftInfo={draftInfo}
