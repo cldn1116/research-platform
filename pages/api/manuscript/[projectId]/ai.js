@@ -2,7 +2,7 @@
  * AI manuscript generation endpoint.
  *
  * POST /api/manuscript/[projectId]/ai
- *   Body: { section?: 'results_discussion' | 'introduction', force?: boolean }
+ *   Body: { section?: 'results_discussion' | 'introduction' | 'methods' | 'abstract' | 'conclusion', force?: boolean }
  *
  * section = 'results_discussion' (default):
  *   Generates Results + Discussion together in one Claude call.
@@ -11,7 +11,10 @@
  * section = 'introduction':
  *   Generates Introduction (Background, Research Gap, Objectives).
  *   Input hash based on project metadata + methods + experiment names.
- *   No experiment result data is passed to Claude.
+ *
+ * section = 'conclusion':
+ *   Generates 3-part Conclusion (keyResults, significance, applications).
+ *   Requires results_ai or discussion_ai to exist first.
  *
  * force = false (default): return cached output when input hash is unchanged.
  * force = true: always call Claude regardless of cache.
@@ -30,6 +33,8 @@ import {
   computeMethodsHash,
   generateAiAbstract,
   computeAbstractHash,
+  generateAiConclusion,
+  computeConclusionHash,
 } from '../../../../lib/aiManuscriptGenerator';
 
 export default async function handler(req, res) {
@@ -40,9 +45,9 @@ export default async function handler(req, res) {
   const { projectId } = req.query;
   const { force = false, section = 'results_discussion' } = req.body || {};
 
-  if (!['results_discussion', 'introduction', 'methods', 'abstract'].includes(section)) {
+  if (!['results_discussion', 'introduction', 'methods', 'abstract', 'conclusion'].includes(section)) {
     return res.status(400).json({
-      error: `Unknown section "${section}". Valid values: results_discussion, introduction, methods, abstract`,
+      error: `Unknown section "${section}". Valid values: results_discussion, introduction, methods, abstract, conclusion`,
     });
   }
 
@@ -81,6 +86,13 @@ export default async function handler(req, res) {
 
     if (section === 'abstract') {
       return await handleAbstract({
+        res, projectId, project,
+        force, existing, prevManuscript, prevTimestamps,
+      });
+    }
+
+    if (section === 'conclusion') {
+      return await handleConclusion({
         res, projectId, project,
         force, existing, prevManuscript, prevTimestamps,
       });
@@ -306,6 +318,52 @@ async function handleAbstract({
   const mergedTimestamps = {
     ...prevTimestamps,
     abstract_ai: nowStr,
+  };
+
+  return saveAndRespond({ res, projectId, existing, project, mergedManuscript, mergedTimestamps });
+}
+
+// ── Conclusion ─────────────────────────────────────────────────────────────
+
+async function handleConclusion({
+  res, projectId, project,
+  force, existing, prevManuscript, prevTimestamps,
+}) {
+  // Require at least Results or Discussion AI content
+  if (!prevManuscript.results_ai && !prevManuscript.discussion_ai) {
+    return res.status(400).json({
+      error: 'Conclusion을 생성하려면 먼저 Results & Discussion AI를 생성하세요.',
+    });
+  }
+
+  // Cache check
+  if (!force) {
+    const currentHash = computeConclusionHash(project, prevManuscript);
+    if (
+      currentHash === prevManuscript.conclusion_input_hash &&
+      prevManuscript.conclusion_ai
+    ) {
+      return res.status(200).json({
+        manuscript:                  prevManuscript,
+        generated_at:                existing?.generated_at ?? null,
+        timestamps:                  prevTimestamps,
+        project_updated_at_snapshot: existing?.project_updated_at_snapshot ?? null,
+        cached:                      true,
+      });
+    }
+  }
+
+  const { conclusion_ai, conclusionHash } = await generateAiConclusion(project, prevManuscript);
+
+  const nowStr = new Date().toISOString();
+  const mergedManuscript = {
+    ...prevManuscript,
+    conclusion_ai,
+    conclusion_input_hash: conclusionHash,
+  };
+  const mergedTimestamps = {
+    ...prevTimestamps,
+    conclusion_ai: nowStr,
   };
 
   return saveAndRespond({ res, projectId, existing, project, mergedManuscript, mergedTimestamps });

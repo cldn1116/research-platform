@@ -16,11 +16,20 @@ function relativeTime(isoStr) {
 
 // ── Helpers ────────────────────────────────────────────────────────────────
 
-/** Shorten a potentially long experiment name to a clean heading. */
-function shortName(s, maxLen = 80) {
-  if (!s) return '';
-  const first = s.split(/[\n\r]/)[0].trim();
-  return first.length > maxLen ? `${first.slice(0, maxLen - 1)}\u2026` : first;
+/**
+ * Convert an experiment name into a clean English manuscript sub-heading.
+ * - Strips to the first line
+ * - Replaces Korean/CJK names with "Experiment N" (manuscripts must be English)
+ * - Truncates to 80 chars
+ */
+function sanitizeTitle(name, idx) {
+  if (!name) return `Experiment ${idx + 1}`;
+  const first = name.split(/[\n\r]/)[0].trim();
+  // Korean (Hangul syllables + Jamo + Compatibility Jamo) → generic English label
+  if (/[\uAC00-\uD7AF\u1100-\u11FF\u3130-\u318F]/.test(first)) {
+    return `Experiment ${idx + 1}`;
+  }
+  return first.length > 80 ? `${first.slice(0, 79)}\u2026` : first;
 }
 
 /** Build figure legend from v2 multi-series or v1 single-series growth_curve_data. */
@@ -322,6 +331,18 @@ function GenerationToolbar({ draftInfo, isStale, generating, onGenerate, hasDraf
           ts={ts}
         />
 
+        {/* AI Conclusion */}
+        <AiButton
+          section="conclusion"
+          label={ko.preview.btnAiConclusion}
+          tip={ko.preview.tipAiConclusion}
+          tsKey="conclusion_ai"
+          aiGenerating={aiGenerating}
+          generating={generating}
+          onAiGenerate={onAiGenerate}
+          ts={ts}
+        />
+
         {/* Regenerate — shown when any AI content exists */}
         {hasAiContent && (
           <button
@@ -435,7 +456,8 @@ export default function ManuscriptPreview({
     manuscript?.discussion_ai ||
     manuscript?.introduction_ai ||
     manuscript?.methods_ai    ||
-    manuscript?.abstract_ai
+    manuscript?.abstract_ai  ||
+    manuscript?.conclusion_ai
   );
 
   // Build map: experiment id → AI formalText (for Results section)
@@ -458,6 +480,8 @@ export default function ManuscriptPreview({
     overlayMsg = ko.preview.aiIntroOverlayMsg;
   } else if (aiGenerating === 'methods') {
     overlayMsg = ko.preview.aiMethodsOverlayMsg;
+  } else if (aiGenerating === 'conclusion') {
+    overlayMsg = ko.preview.aiConclusionOverlayMsg;
   } else if (aiGenerating) {
     overlayMsg = ko.preview.aiOverlayMsg;
   } else if (generating) {
@@ -783,7 +807,7 @@ export default function ManuscriptPreview({
                           const figNum     = exp.figureNumber || (gcHasData ? ei + 1 : null);
                           return (
                             <div key={exp.id || ei} className="mb-6">
-                              <SubTitle>3.{ei + 1} {shortName(exp.name) || `Experiment ${exp.id}`}</SubTitle>
+                              <SubTitle>3.{ei + 1} {sanitizeTitle(exp.name, ei)}</SubTitle>
                               {exp.conditions && (
                                 <p className="text-xs text-gray-500 italic mb-2">Conditions: {exp.conditions}</p>
                               )}
@@ -819,7 +843,7 @@ export default function ManuscriptPreview({
                       const autoLegend = buildAutoLegend(gcd, exp.name || `Experiment ${exp.id}`);
                       return (
                         <div key={exp.id || ei} className="mb-6">
-                          <SubTitle>3.{ei + 1} {shortName(exp.name) || `Experiment ${exp.id}`}</SubTitle>
+                          <SubTitle>3.{ei + 1} {exp.englishTitle || sanitizeTitle(exp.name, ei)}</SubTitle>
                           <Para text={exp.formalText} />
                           {autoLegend && (
                             <div className="manuscript-figure-legend">
@@ -908,10 +932,37 @@ export default function ManuscriptPreview({
             )}
 
             {/* ── 5. Conclusion ── English content ───────────── */}
-            {manuscript.conclusion ? (
+            {(manuscript.conclusion_ai || manuscript.conclusion) ? (
               <>
                 <SectionTitle number="5" title="Conclusion" />
-                <Para text={manuscript.conclusion} />
+                {manuscript.conclusion_ai ? (
+                  <>
+                    <div className="inline-flex items-center gap-1 text-xs text-violet-700 bg-violet-50 border border-violet-200 px-2 py-0.5 rounded mb-3 no-print">
+                      <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
+                          d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z" />
+                      </svg>
+                      {ko.preview.aiBadge}
+                    </div>
+                    {/* 3-part structured conclusion */}
+                    {manuscript.conclusion_ai.keyResults && (
+                      <Para text={manuscript.conclusion_ai.keyResults} />
+                    )}
+                    {manuscript.conclusion_ai.significance && (
+                      <Para text={manuscript.conclusion_ai.significance} />
+                    )}
+                    {manuscript.conclusion_ai.applications && (
+                      <Para text={manuscript.conclusion_ai.applications} />
+                    )}
+                    {/* Fallback: plain text (parse failure) */}
+                    {manuscript.conclusion_ai.text && !manuscript.conclusion_ai.keyResults && (
+                      <Para text={manuscript.conclusion_ai.text} />
+                    )}
+                    <SectionTimestamp ts={draftInfo?.timestamps?.conclusion_ai} label={ko.preview.tsAiConclusionLabel} />
+                  </>
+                ) : (
+                  <Para text={manuscript.conclusion} />
+                )}
               </>
             ) : (
               <SectionGhost title="5. Conclusion" />

@@ -32,7 +32,8 @@ const MARKER_SHAPES = ['circle', 'square', 'triangle', 'diamond'];
 
 function seriesType(name) {
   const n = (name || '').toLowerCase();
-  if (/\bod\b|biomass|cell\s*density|cdw|dcw|growth|optical\s*density/i.test(n)) return 'biomass';
+  // \bod\d* matches "od", "od600", "od560" — \bod\b alone misses "od600" (no word boundary before digit)
+  if (/\bod\d*|biomass|cell\s*density|cdw|dcw|growth|optical/i.test(n)) return 'biomass';
   if (/etoh|ethanol|alcohol/i.test(n)) return 'ethanol';
   if (/glucose|sucrose|lactose|fructose|xylose|substrate|sugar/i.test(n)) return 'substrate';
   if (/\bph\b/i.test(n)) return 'ph';
